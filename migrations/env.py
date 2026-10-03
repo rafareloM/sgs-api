@@ -14,6 +14,9 @@ from sqlalchemy import Connection, text
 from src.core.config import load_settings
 from src.core.db import MIGRATION_LOCK_ID, create_engine, metadata
 
+# Registram as tabelas de cada módulo no metadata, para o autogenerate (`make migrate`) vê-las.
+from src.modules.audit.infrastructure import tables as _audit_tables  # noqa: F401
+
 config = context.config
 
 

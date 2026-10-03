@@ -143,7 +143,11 @@ forbidden_modules = [
   "structlog",
   "pydantic_settings",
 ]
-ignore_imports = ["src.modules.*.application.** -> src.core.errors"]
+ignore_imports = [
+  "src.modules.*.application.** -> src.core.errors",
+  # O domain pode importar core.errors; a application o alcança por ele.
+  "src.modules.*.domain.** -> src.core.errors",
+]
 unmatched_ignore_imports_alerting = "none"
 
 [[tool.importlinter.contracts]]

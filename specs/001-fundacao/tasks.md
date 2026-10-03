@@ -17,7 +17,7 @@
 - [x] T5. Banco async, Alembic e migração `0001_base` com `audit_log` imutável
   - Requisitos: R1.2, R5.2
   - Pronto quando: `tests/integration/audit/test_audit_immutable.py` passa
-- [ ] T6. Serviço `audit.registrar` com hash encadeado
+- [x] T6. Serviço `audit.registrar` com hash encadeado
   - Requisitos: R5.1, R5.3
   - Pronto quando: `tests/integration/audit/test_audit_chain.py` passa
 - [ ] T7. Cabeçalhos de segurança, CORS e OpenAPI só fora de prod

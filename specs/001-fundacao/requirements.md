@@ -51,3 +51,5 @@ Como integrante do grupo, quero subir a API e suas dependências com um comando 
 
 ## Perguntas em aberto
 - Qual integrante é o dono humano desta spec?
+- Campos sensíveis em `changes` devem aparecer como `"***"` (modelo de dados, §3)? Não há requisito na 001; proposta: tratar na 008.
+- Partição mensal e retenção de 2 anos do `audit_log` (modelo de dados e `steering/security.md`) não têm requisito nem tarefa. Entram em qual spec?

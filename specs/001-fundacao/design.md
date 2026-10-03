@@ -21,9 +21,9 @@ Ver `steering/structure.md`. Nesta spec nascem: `core/config.py`, `core/db.py`, 
 Hierarquia `AppError(status, type, title)` → `NotFound`, `Forbidden`, `Conflict`, `DomainValidationError`. Handlers para `AppError`, `RequestValidationError` (traduz mensagens do Pydantic para português) e `Exception`.
 
 ## Auditoria (`modules/audit`)
-- `domain/`: `AuditEntry` e cálculo do hash canônico (JSON ordenado, sem espaços).
-- `application/registrar.py`: busca o último hash com `SELECT ... FOR UPDATE` em uma linha de controle (`audit_chain_head`) para serializar o encadeamento.
-- `infrastructure/`: repositório SQLAlchemy.
+- `domain/entry.py`: `AuditEntry` (com `Ator`, `Entidade` e `Mudanca`) e o hash canônico: `hash = SHA-256(prev_hash || JSON)`, com o JSON de chaves ordenadas, sem espaços, em UTF-8, data em UTC com microssegundos e IP normalizado. `domain/ports.py`: porta `AuditStore`.
+- `application/registrar.py`: `registrar(store, acao, ator, entidade, mudancas, metadados)` trava a linha de controle `audit_chain_head` (pela porta `AuditStore`, cujo repositório faz `SELECT ... FOR UPDATE`) para serializar o encadeamento, monta o registro e grava na transação de quem chamou. Os outros módulos importam tudo daqui (os tipos do domain são reexportados).
+- `infrastructure/`: tabelas (SQLAlchemy Core) e `SqlAuditStore`. `prev_hash` é único no banco, então a cadeia não bifurca.
 
 ## Docker
 `docker/compose.yml` com serviços `api`, `db` (postgres:17) e `proxy` (Caddy com TLS interno). Os serviços `ldap` (OpenLDAP com seed LDIF), `keycloak` (26.x, realm importado de `docker/keycloak/realm-sgs.json`) e `s3` (SeaweedFS) entram no compose nas specs 004 (T8) e 005 (T8). Override `compose.test.yml` para CI.
