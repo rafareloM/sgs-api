@@ -1,6 +1,7 @@
 """Rotas de saúde (spec 001, R1.3 e R1.4). São públicas e ficam fora de /api/v1."""
 
 import asyncio
+import os
 from typing import Any, Literal
 
 import structlog
