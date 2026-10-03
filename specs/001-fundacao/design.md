@@ -9,7 +9,7 @@ Projeto `sgs-api` gerenciado com `uv`, código em `src/sgs_api`, testes em `test
 Ver `steering/structure.md`. Nesta spec nascem: `core/config.py`, `core/db.py`, `core/errors.py`, `core/logging.py`, `core/security_headers.py`, `modules/audit/`, `migrations/`, `docker/`, `.github/workflows/ci.yml`.
 
 ## Configuração (`core/config.py`)
-`Settings(BaseSettings)` com grupos: `app` (env, cors_origins), `db` (url, ssl_mode, pool), `jwt` (chaves, ttl), `crypto` (chaves de campo versionadas), `ldap`, `oidc`, `s3`. Validadores implementam R2.3.
+`Settings(BaseSettings)`, lida só de variáveis de ambiente (sem arquivo `.env` dentro da aplicação), com grupos: `app` (`APP_ENV`, `DEBUG`, `LOG_LEVEL`, `CORS_ORIGINS`) e `db` (`DATABASE_URL`, `DATABASE_MIGRATION_URL`, `DATABASE_SSL_MODE`, `DATABASE_SSL_ROOT_CERT`, pool) nesta spec; `jwt` e `crypto` entram na 002; `ldap`, `oidc` e `s3` nas 004 e 005. Validadores implementam R2.3: em `prod`, recusa `DEBUG` ligado, TLS diferente de `verify-full` e senha de exemplo nas URLs do banco (as do `.env.example` e do compose, ou qualquer senha com "troque", "exemplo", "example" ou "changeme"). `load_settings()` converte os erros em mensagens que nomeiam a variável, sem ecoar o valor recebido.
 
 ## Banco (`core/db.py`)
 - `create_async_engine` com asyncpg, `pool_pre_ping`, contexto SSL com `verify-full` fora de `dev`.

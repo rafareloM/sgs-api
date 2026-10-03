@@ -5,7 +5,7 @@
 - [x] T1. Criar projeto com `uv init`, `pyproject.toml`, ruff, mypy, pytest, import-linter e pre-commit
   - Requisitos: R7.1
   - Pronto quando: `uv run ruff check`, `uv run mypy`, `uv run lint-imports` e `uv run pytest` passam no repositório vazio
-- [ ] T2. `core/config.py` com Settings e validações de produção
+- [x] T2. `core/config.py` com Settings e validações de produção
   - Requisitos: R2.1, R2.2, R2.3
   - Pronto quando: `tests/unit/core/test_config.py` passa
 - [ ] T3. `create_app`, rotas de health e middleware de request id + logs JSON
