@@ -1,6 +1,6 @@
 # 001 · Fundação da API · Requisitos
 
-- Status: Aprovado (Leonardo, 03/10/2026)
+- Status: Aprovado (Rafael, 03/10/2026)
 - Rastreia: RNF-01, RNF-06, RS-03, RS-05, RS-08, critério 6.1 "sobe em outra máquina"
 
 ## Contexto

@@ -1,6 +1,6 @@
 # 001 · Fundação da API · Design
 
-- Status: Aprovado (Leonardo, 03/10/2026)
+- Status: Aprovado (Rafael, 03/10/2026)
 
 ## Visão geral
 Projeto `sgs-api` gerenciado com `uv`, código direto em `src/` (o pacote importável é `src`), testes em `tests/`. O app é criado por uma fábrica `create_app(settings)` para permitir testes com configurações diferentes.

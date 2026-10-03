@@ -1,6 +1,6 @@
 # 001 · Fundação da API · Tarefas
 
-- Status: Aprovado (Leonardo, 03/10/2026)
+- Status: Aprovado (Rafael, 03/10/2026)
 
 - [x] T1. Criar projeto com `uv init`, `pyproject.toml`, ruff, mypy, pytest, import-linter e pre-commit
   - Requisitos: R7.1

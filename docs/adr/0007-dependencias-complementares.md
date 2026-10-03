@@ -1,6 +1,6 @@
 # ADR-0007: Dependências complementares da stack (Uvicorn, slowapi, pytest-cov)
 
-- Status: Aceito (Leonardo, 03/10/2026)
+- Status: Aceito (Rafael, 03/10/2026)
 - Data: 2026-10-03
 - Requisitos relacionados: RS-09, RNF-06; specs 001 (R1.1, R7.1) e 002 (R1.5)
 

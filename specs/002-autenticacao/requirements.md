@@ -1,6 +1,6 @@
 # 002 · Autenticação · Requisitos
 
-- Status: Aprovado (Leonardo, 03/10/2026)
+- Status: Aprovado (Rafael, 03/10/2026)
 - Rastreia: RS-01, RS-03, RS-04, RS-05, RS-08, RS-09, critério 6.1 "login leva a tela coerente com o perfil"
 
 ## Contexto
