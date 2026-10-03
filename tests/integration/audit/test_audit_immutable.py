@@ -9,9 +9,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from sgs_api.core.config import AppEnv
-from sgs_api.core.db import MIGRATION_LOCK_ID, alembic_config, run_migrations
-from sgs_api.main import create_app
+from src.core.config import AppEnv
+from src.core.db import MIGRATION_LOCK_ID, alembic_config, run_migrations
+from src.main import create_app
 from tests.factories import make_settings
 from tests.integration.postgres import BancoDeTeste, motor
 

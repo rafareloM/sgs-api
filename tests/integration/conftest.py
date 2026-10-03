@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
-from sgs_api.core.db import run_migrations
+from src.core.db import run_migrations
 from tests.factories import make_settings
 from tests.integration.postgres import LOGIN_DA_API, SENHA_DA_API, BancoDeTeste, como_texto
 

@@ -35,10 +35,15 @@ dev = [
 requires = ["uv_build>=0.11.28,<0.13"]
 build-backend = "uv_build"
 
+# O código fica direto em src/: o pacote importável se chama `src`.
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
-src = ["src", "tests"]
+src = ["."]
 # Trechos de código nas specs e docs são ilustrativos; não são formatados nem verificados.
 extend-exclude = ["*.md"]
 
@@ -51,10 +56,10 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
 # NotFound, Forbidden e Conflict são os nomes definidos no design da spec 001.
-"src/sgs_api/core/errors.py" = ["N818"]
+"src/core/errors.py" = ["N818"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["sgs_api"]
+known-first-party = ["src", "tests"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -74,7 +79,7 @@ asyncio_default_test_loop_scope = "session"
 xfail_strict = true
 
 [tool.coverage.run]
-source = ["sgs_api"]
+source = ["src"]
 branch = true
 
 [tool.coverage.report]
@@ -82,19 +87,19 @@ show_missing = true
 skip_covered = true
 
 [tool.importlinter]
-root_package = "sgs_api"
+root_package = "src"
 include_external_packages = true
 
-# Regras de steering/structure.md. Curingas valem para todos os módulos em sgs_api.modules.
+# Regras de steering/structure.md. Curingas valem para todos os módulos em src.modules.
 [[tool.importlinter.contracts]]
 id = "dominio-puro"
 name = "domain só importa stdlib, pydantic e core.errors"
 type = "forbidden"
-source_modules = ["sgs_api.modules.*.domain"]
+source_modules = ["src.modules.*.domain"]
 forbidden_modules = [
-  "sgs_api.core",
-  "sgs_api.main",
-  "sgs_api.tools",
+  "src.core",
+  "src.main",
+  "src.tools",
   "fastapi",
   "starlette",
   "sqlalchemy",
@@ -104,31 +109,31 @@ forbidden_modules = [
   "structlog",
   "pydantic_settings",
 ]
-ignore_imports = ["sgs_api.modules.*.domain.** -> sgs_api.core.errors"]
+ignore_imports = ["src.modules.*.domain.** -> src.core.errors"]
 unmatched_ignore_imports_alerting = "none"
 
 [[tool.importlinter.contracts]]
 id = "dominios-independentes"
 name = "O domain de um módulo não importa o domain de outro"
 type = "independence"
-modules = ["sgs_api.modules.*.domain"]
+modules = ["src.modules.*.domain"]
 
 [[tool.importlinter.contracts]]
 id = "camadas-dos-modulos"
 name = "Em cada módulo: api > application > domain"
 type = "layers"
-containers = ["sgs_api.modules.*"]
+containers = ["src.modules.*"]
 layers = ["(api)", "(application)", "(domain)"]
 
 [[tool.importlinter.contracts]]
 id = "aplicacao-sem-frameworks"
 name = "application não importa frameworks, drivers nem core (exceto core.errors)"
 type = "forbidden"
-source_modules = ["sgs_api.modules.*.application"]
+source_modules = ["src.modules.*.application"]
 forbidden_modules = [
-  "sgs_api.core",
-  "sgs_api.main",
-  "sgs_api.tools",
+  "src.core",
+  "src.main",
+  "src.tools",
   "fastapi",
   "starlette",
   "sqlalchemy",
@@ -138,19 +143,19 @@ forbidden_modules = [
   "structlog",
   "pydantic_settings",
 ]
-ignore_imports = ["sgs_api.modules.*.application.** -> sgs_api.core.errors"]
+ignore_imports = ["src.modules.*.application.** -> src.core.errors"]
 unmatched_ignore_imports_alerting = "none"
 
 [[tool.importlinter.contracts]]
 id = "infraestrutura-protegida"
 name = "infrastructure só é importada pela raiz de composição"
 type = "protected"
-protected_modules = ["sgs_api.modules.*.infrastructure"]
-allowed_importers = ["sgs_api.main"]
+protected_modules = ["src.modules.*.infrastructure"]
+allowed_importers = ["src.main"]
 
 [[tool.importlinter.contracts]]
 id = "infraestrutura-isolada"
 name = "infrastructure só importa domain, core e bibliotecas"
 type = "forbidden"
-source_modules = ["sgs_api.modules.*.infrastructure"]
-forbidden_modules = ["sgs_api.modules.*.application", "sgs_api.modules.*.api", "sgs_api.main"]
+source_modules = ["src.modules.*.infrastructure"]
+forbidden_modules = ["src.modules.*.application", "src.modules.*.api", "src.main"]

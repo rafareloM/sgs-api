@@ -9,8 +9,8 @@ import sys
 
 from pydantic import SecretStr
 
-from sgs_api.core.config import AppEnv, DatabaseSslMode, Settings
-from sgs_api.main import create_app
+from src.core.config import AppEnv, DatabaseSslMode, Settings
+from src.main import create_app
 
 # Nenhuma conexão é aberta para gerar o contrato; a URL só precisa ser válida.
 _CONTRACT_DATABASE_URL = "postgresql+asyncpg://contrato:contrato@localhost:5432/contrato"

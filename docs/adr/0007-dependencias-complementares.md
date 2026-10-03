@@ -15,7 +15,7 @@ Adicionar à stack, com a mesma regra de versão das demais (série fixa, `uv.lo
 
 | Item | Versão | Uso |
 |---|---|---|
-| Uvicorn | 0.54.x | Servidor ASGI (`uvicorn --factory sgs_api.main:create_app`) |
+| Uvicorn | 0.54.x | Servidor ASGI (`uvicorn --factory src.main:create_app`) |
 | slowapi | 0.1.x | Rate limit por IP no login; entra no `pyproject.toml` na 002/T7 |
 | pytest-cov | 7.x | Relatório de cobertura no CI (só desenvolvimento) |
 

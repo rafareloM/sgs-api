@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from sgs_api.core.logging import REDACTED, configure_logging, redact_sensitive
+from src.core.logging import REDACTED, configure_logging, redact_sensitive
 
 
 @pytest.mark.parametrize(

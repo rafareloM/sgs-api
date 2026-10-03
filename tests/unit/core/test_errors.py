@@ -8,7 +8,7 @@ import pytest
 from fastapi import APIRouter, FastAPI
 from pydantic import BaseModel, Field
 
-from sgs_api.core.errors import (
+from src.core.errors import (
     AppError,
     Conflict,
     DomainValidationError,
@@ -16,7 +16,7 @@ from sgs_api.core.errors import (
     Forbidden,
     NotFound,
 )
-from sgs_api.main import create_app
+from src.main import create_app
 from tests.factories import make_settings
 
 PROBLEM_JSON = "application/problem+json"

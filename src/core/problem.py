@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from sgs_api.core.errors import AppError, DomainValidationError, FieldError
+from src.core.errors import AppError, DomainValidationError, FieldError
 
 PROBLEM_JSON = "application/problem+json"
 

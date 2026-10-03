@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import pytest
 
-from sgs_api.core.config import AppEnv, Settings, SettingsError, load_settings
+from src.core.config import AppEnv, Settings, SettingsError, load_settings
 
 type DefinirAmbiente = Callable[[dict[str, str]], None]
 

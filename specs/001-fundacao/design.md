@@ -3,7 +3,7 @@
 - Status: Aprovado (Leonardo, 03/10/2026)
 
 ## Visão geral
-Projeto `sgs-api` gerenciado com `uv`, código em `src/sgs_api`, testes em `tests/`. O app é criado por uma fábrica `create_app(settings)` para permitir testes com configurações diferentes.
+Projeto `sgs-api` gerenciado com `uv`, código direto em `src/` (o pacote importável é `src`), testes em `tests/`. O app é criado por uma fábrica `create_app(settings)` para permitir testes com configurações diferentes.
 
 ## Estrutura
 Ver `steering/structure.md`. Nesta spec nascem: `core/config.py`, `core/db.py`, `core/errors.py`, `core/logging.py`, `core/security_headers.py`, `modules/audit/`, `migrations/`, `docker/`, `.github/workflows/ci.yml`.

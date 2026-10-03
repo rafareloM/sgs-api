@@ -6,12 +6,12 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 
-from sgs_api.core import health
-from sgs_api.core.config import AppEnv, Settings, load_settings
-from sgs_api.core.db import create_engine, run_migrations
-from sgs_api.core.logging import configure_logging
-from sgs_api.core.problem import install_error_handlers
-from sgs_api.core.request_context import RequestContextMiddleware
+from src.core import health
+from src.core.config import AppEnv, Settings, load_settings
+from src.core.db import create_engine, run_migrations
+from src.core.logging import configure_logging
+from src.core.problem import install_error_handlers
+from src.core.request_context import RequestContextMiddleware
 
 
 @asynccontextmanager

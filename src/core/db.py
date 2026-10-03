@@ -9,10 +9,10 @@ from sqlalchemy import Connection, MetaData
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from sgs_api.core.config import DatabaseSslMode, Settings
+from src.core.config import DatabaseSslMode, Settings
 
-# src/sgs_api/core/db.py → raiz do repositório, onde ficam alembic.ini e migrations/.
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+# src/core/db.py → raiz do repositório, onde ficam alembic.ini e migrations/.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Lock de sessão do PostgreSQL (pg_advisory_xact_lock) que serializa as migrações: instâncias
 # que sobem juntas migram uma de cada vez. Número fixo e arbitrário.

@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
-from sgs_api.core.config import AppEnv, DatabaseSslMode, Settings
+from src.core.config import AppEnv, DatabaseSslMode, Settings
 
 # Banco fictício: os testes que precisam de banco de verdade usam tests/integration/conftest.py.
 URL_SEM_BANCO = "postgresql+asyncpg://sgs_api:sgs_api@127.0.0.1:1/sgs"

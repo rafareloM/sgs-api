@@ -8,7 +8,7 @@ import structlog
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from sgs_api.core.problem import internal_error_response
+from src.core.problem import internal_error_response
 
 REQUEST_ID_HEADER = "X-Request-ID"
 # O valor recebido vai para logs e respostas; o formato restrito evita injeção nos logs.
