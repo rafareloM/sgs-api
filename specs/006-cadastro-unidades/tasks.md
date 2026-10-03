@@ -1,0 +1,35 @@
+# 006 · Cadastro de unidades, equipamentos e serviços · Tarefas
+
+- Status: Rascunho
+- Depende de: 001, 003
+
+- [ ] T1. Migração `0006_registry` com referências, índices (`pg_trgm`, `unaccent`, únicos parciais) e seed das referências
+  - Requisitos: R1.3, R1.4, R7.1
+  - Pronto quando: `tests/integration/registry/test_schema_registry.py` passa
+- [ ] T2. Domínio: normalização de nome, `diff`, campos estruturais
+  - Requisitos: R1.4, R3.4, R3.6
+  - Pronto quando: `tests/unit/registry/test_dominio_unidade.py` passa
+- [ ] T3. Criar unidade com unicidade e auditoria
+  - Requisitos: R1.1–R1.6
+  - Pronto quando: `tests/integration/registry/test_criar_unidade.py` passa
+- [ ] T4. Listar, buscar, filtrar, ordenar e detalhar com escopo
+  - Requisitos: R2.1–R2.6
+  - Pronto quando: `tests/integration/registry/test_buscar_unidades.py` passa
+- [ ] T5. Atualizar com `If-Match`, escopo, campos estruturais e auditoria por campo
+  - Requisitos: R3.1–R3.6
+  - Pronto quando: `tests/integration/registry/test_atualizar_unidade.py` passa
+- [ ] T6. Desativar unidade
+  - Requisitos: R4.1, R4.2
+  - Pronto quando: `tests/integration/registry/test_desativar_unidade.py` passa
+- [ ] T7. Equipamentos (vinculados e sem unidade)
+  - Requisitos: R5.1–R5.3
+  - Pronto quando: `tests/integration/registry/test_equipamentos.py` passa
+- [ ] T8. Serviços (vinculados e soltos) e vínculo por id
+  - Requisitos: R6.1–R6.4
+  - Pronto quando: `tests/integration/registry/test_servicos.py` passa
+- [ ] T9. Rotas de referência
+  - Requisitos: R7.1, R7.2
+  - Pronto quando: `tests/integration/registry/test_referencias.py` passa
+- [ ] T10. Teste de desempenho da busca
+  - Requisitos: R2.7
+  - Pronto quando: `tests/e2e/test_busca_desempenho.py -m slow` passa

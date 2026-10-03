@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Editor / SO
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code (configuração pessoal)
+.claude/settings.local.json

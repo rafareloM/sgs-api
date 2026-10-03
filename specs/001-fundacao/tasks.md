@@ -1,0 +1,31 @@
+# 001 · Fundação da API · Tarefas
+
+- Status: Rascunho
+
+- [ ] T1. Criar projeto com `uv init`, `pyproject.toml`, ruff, mypy, pytest, import-linter e pre-commit
+  - Requisitos: R7.1
+  - Pronto quando: `uv run ruff check`, `uv run mypy`, `uv run lint-imports` e `uv run pytest` passam no repositório vazio
+- [ ] T2. `core/config.py` com Settings e validações de produção
+  - Requisitos: R2.1, R2.2, R2.3
+  - Pronto quando: `tests/unit/core/test_config.py` passa
+- [ ] T3. `create_app`, rotas de health e middleware de request id + logs JSON
+  - Requisitos: R1.3, R4.1, R4.2, R4.3
+  - Pronto quando: `tests/integration/test_health.py` e `tests/unit/core/test_logging_redaction.py` passam
+- [ ] T4. Handlers de erro problem+json com tradução de mensagens
+  - Requisitos: R3.1, R3.2, R3.3
+  - Pronto quando: `tests/unit/core/test_errors.py` passa
+- [ ] T5. Banco async, Alembic e migração `0001_base` com `audit_log` imutável
+  - Requisitos: R1.2, R5.2
+  - Pronto quando: `tests/integration/audit/test_audit_immutable.py` passa
+- [ ] T6. Serviço `audit.registrar` com hash encadeado
+  - Requisitos: R5.1, R5.3
+  - Pronto quando: `tests/integration/audit/test_audit_chain.py` passa
+- [ ] T7. Cabeçalhos de segurança, CORS e OpenAPI só fora de prod
+  - Requisitos: R6.1, R6.2, R6.3
+  - Pronto quando: `tests/integration/test_security_headers.py` passa
+- [ ] T8. Docker compose completo + README de subida
+  - Requisitos: R1.1, R1.4
+  - Pronto quando: job `compose-smoke` do CI fica verde
+- [ ] T9. Workflow de CI completo e proteção de branch
+  - Requisitos: R7.1, R7.2
+  - Pronto quando: PR de teste com lint quebrado é bloqueado

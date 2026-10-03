@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sgs
+          POSTGRES_PASSWORD: sgs
+          POSTGRES_DB: sgs_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sgs" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://sgs:sgs@localhost:5432/sgs_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Lint e formatação
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Tipos
+        run: uv run mypy
+      - name: Regras de arquitetura
+        run: uv run lint-imports
+      - name: Testes
+        run: uv run pytest -m "not slow" --cov=sgs_api --cov-report=term-missing
+      - name: Contrato OpenAPI atualizado
+        run: |
+          uv run python -m sgs_api.tools.export_openapi > /tmp/openapi.yaml
+          diff -u contracts/openapi.yaml /tmp/openapi.yaml
+      - name: Segurança
+        run: |
+          uv run bandit -q -r src
+          uv run pip-audit
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker/compose.yml -f docker/compose.test.yml up -d --wait
+      - run: curl -fsSk https://localhost/health/ready
+      - if: always()
+        run: docker compose -f docker/compose.yml logs --no-color | tail -n 200
