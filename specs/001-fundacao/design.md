@@ -25,6 +25,11 @@ Hierarquia `AppError(status, type, title)` → `NotFound`, `Forbidden`, `Conflic
 - `application/registrar.py`: `registrar(store, acao, ator, entidade, mudancas, metadados)` trava a linha de controle `audit_chain_head` (pela porta `AuditStore`, cujo repositório faz `SELECT ... FOR UPDATE`) para serializar o encadeamento, monta o registro e grava na transação de quem chamou. Os outros módulos importam tudo daqui (os tipos do domain são reexportados).
 - `infrastructure/`: tabelas (SQLAlchemy Core) e `SqlAuditStore`. `prev_hash` é único no banco, então a cadeia não bifurca.
 
+## Segurança transversal (`core/security_headers.py`, `main.py`)
+- `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e `Cache-Control: no-store` em todas as respostas, não só nas autenticadas (R6.1, opção mais restritiva). Uma rota pode definir o próprio `Cache-Control`.
+- CORS só para `CORS_ORIGINS`, com credenciais (cookie do refresh na 002), métodos e cabeçalhos explícitos (R6.2).
+- `/openapi.json`, `/docs` e `/redoc` só em `dev` e `test` (R6.3).
+
 ## Docker
 `docker/compose.yml` com serviços `api`, `db` (postgres:17) e `proxy` (Caddy com TLS interno). Os serviços `ldap` (OpenLDAP com seed LDIF), `keycloak` (26.x, realm importado de `docker/keycloak/realm-sgs.json`) e `s3` (SeaweedFS) entram no compose nas specs 004 (T8) e 005 (T8). Override `compose.test.yml` para CI.
 

@@ -20,7 +20,7 @@
 - [x] T6. Serviço `audit.registrar` com hash encadeado
   - Requisitos: R5.1, R5.3
   - Pronto quando: `tests/integration/audit/test_audit_chain.py` passa
-- [ ] T7. Cabeçalhos de segurança, CORS e OpenAPI só fora de prod
+- [x] T7. Cabeçalhos de segurança, CORS e OpenAPI só fora de prod
   - Requisitos: R6.1, R6.2, R6.3
   - Pronto quando: `tests/integration/test_security_headers.py` passa
 - [ ] T8. Docker compose (api, db, proxy TLS) + README de subida
