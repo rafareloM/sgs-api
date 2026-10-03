@@ -26,7 +26,7 @@
 - [x] T8. Docker compose (api, db, proxy TLS) + README de subida
   - Requisitos: R1.1, R1.4
   - Pronto quando: job `compose-smoke` do CI fica verde
-- [ ] T9. Workflow de CI completo e proteção de branch
+- [x] T9. Workflow de CI completo e proteção de branch
   - Requisitos: R7.1, R7.2
   - Pronto quando: PR de teste com lint quebrado é bloqueado
-  - Situação em 03/10/2026: CI verde no GitHub (PR #2, quality e compose-smoke); o PR de teste #1, com lint quebrado, falhou no CI e teve o merge recusado pelo mesmo tipo de ruleset. Falta ativar o ruleset "main protegida", criado desativado porque bloquearia o force-push pendente da `main` reescrita.
+  - Verificado em 03/10/2026: CI verde no GitHub (PR #2, quality e compose-smoke); o PR de teste #1, com lint quebrado, falhou no CI e teve o merge recusado pelo ruleset; o ruleset "main protegida" está ativo, sem exceção para administradores.
