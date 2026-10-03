@@ -10,8 +10,8 @@ O status fica no cabeçalho de cada arquivo: `Rascunho` → `Em revisão` → `A
 
 | Spec | Tema | Origem | Status |
 |---|---|---|---|
-| [001-fundacao](001-fundacao/) | Esqueleto da API, config, banco, erros, logs, auditoria base, CI | base para todos | Rascunho |
-| [002-autenticacao](002-autenticacao/) | Login local, 2FA TOTP, tokens, sessões | obrigatório: RBAC (autenticação) | Rascunho |
+| [001-fundacao](001-fundacao/) | Esqueleto da API, config, banco, erros, logs, auditoria base, CI | base para todos | Aprovado |
+| [002-autenticacao](002-autenticacao/) | Login local, 2FA TOTP, tokens, sessões | obrigatório: RBAC (autenticação) | Aprovado |
 | [003-rbac](003-rbac/) | Papéis, permissões, escopo, `/me`, administração | obrigatório: RBAC | Rascunho |
 | [004-diretorio-ldap-oidc](004-diretorio-ldap-oidc/) | Bind e sincronização LDAP, login OIDC, grupos | obrigatório: LDAP/OIDC | Rascunho |
 | [005-exportacao-relatorios-s3](005-exportacao-relatorios-s3/) | Relatórios CSV/XLSX, STS, S3, URL pré-assinada | obrigatório: exportação para nuvem | Rascunho |

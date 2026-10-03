@@ -1,6 +1,6 @@
 # 002 · Autenticação · Design
 
-- Status: Rascunho
+- Status: Aprovado (Leonardo, 03/10/2026)
 
 ## Rotas
 | Método e rota | Acesso | Entrada | Saída | Erros | Requisitos |

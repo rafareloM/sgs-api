@@ -1,6 +1,6 @@
 # 001 · Fundação da API · Design
 
-- Status: Rascunho
+- Status: Aprovado (Leonardo, 03/10/2026)
 
 ## Visão geral
 Projeto `sgs-api` gerenciado com `uv`, código em `src/sgs_api`, testes em `tests/`. O app é criado por uma fábrica `create_app(settings)` para permitir testes com configurações diferentes.
@@ -25,7 +25,7 @@ Hierarquia `AppError(status, type, title)` → `NotFound`, `Forbidden`, `Conflic
 - `infrastructure/`: repositório SQLAlchemy.
 
 ## Docker
-`docker/compose.yml` com serviços `api`, `db` (postgres:17), `ldap` (OpenLDAP com seed LDIF), `keycloak` (26.x, realm importado de `docker/keycloak/realm-sgs.json`), `s3` (SeaweedFS), `proxy` (Caddy com TLS interno). Override `compose.test.yml` para CI.
+`docker/compose.yml` com serviços `api`, `db` (postgres:17) e `proxy` (Caddy com TLS interno). Os serviços `ldap` (OpenLDAP com seed LDIF), `keycloak` (26.x, realm importado de `docker/keycloak/realm-sgs.json`) e `s3` (SeaweedFS) entram no compose nas specs 004 (T8) e 005 (T8). Override `compose.test.yml` para CI.
 
 ## CI
 Ver `.github/workflows/ci.yml` (modelo já incluso neste pacote).
