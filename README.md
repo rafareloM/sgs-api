@@ -40,12 +40,12 @@ Para rodar os testes num PostgreSQL já em execução, em vez do testcontainers,
 ## CI e proteção da `main`
 O workflow `.github/workflows/ci.yml` roda em todo PR: dependências travadas, ruff, mypy, import-linter, testes com cobertura (PostgreSQL de serviço), contrato OpenAPI, bandit e pip-audit (job `quality`); depois sobe o compose e chama `/health/ready` pelo proxy TLS (job `compose-smoke`).
 
-Para o merge ficar bloqueado quando algo falha (spec 001, R7.2), a `main` precisa de uma regra de proteção no GitHub (Settings → Branches):
-- exigir pull request com 1 aprovação, descartando aprovações antigas quando chegam commits novos;
-- exigir os checks `quality` e `compose-smoke` verdes, com a branch atualizada;
-- bloquear push direto e force-push, valendo também para administradores.
+Para o merge ficar bloqueado quando algo falha (spec 001, R7.2), a `main` é protegida pelo ruleset "main protegida (spec 001, R7.2)" do repositório (Settings → Rules → Rulesets). Ele vale também para administradores, porque não tem lista de exceções:
+- só aceita mudanças por pull request, com 1 aprovação, descartando aprovações antigas quando chegam commits novos;
+- exige os checks `quality` e `compose-smoke` verdes, com a branch atualizada;
+- bloqueia force-push e exclusão da branch.
 
-Em repositório privado, a proteção de branch exige plano Pro ou Team (o GitHub Student Developer Pack inclui o Pro); em repositório público, está disponível no plano gratuito.
+A regra foi testada em 03/10/2026 numa branch descartável: um PR com lint quebrado falhou no CI e o merge foi recusado ("the base branch policy prohibits the merge"). Na máquina de cada um, o hook `no-commit-to-branch` do pre-commit também recusa commits feitos direto na `main`.
 
 ## Comece por aqui
 | Documento | Para quê |
