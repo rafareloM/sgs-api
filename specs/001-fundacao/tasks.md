@@ -8,7 +8,7 @@
 - [x] T2. `core/config.py` com Settings e validações de produção
   - Requisitos: R2.1, R2.2, R2.3
   - Pronto quando: `tests/unit/core/test_config.py` passa
-- [ ] T3. `create_app`, rotas de health e middleware de request id + logs JSON
+- [x] T3. `create_app`, rotas de health e middleware de request id + logs JSON
   - Requisitos: R1.3, R4.1, R4.2, R4.3
   - Pronto quando: `tests/integration/test_health.py` e `tests/unit/core/test_logging_redaction.py` passam
 - [ ] T4. Handlers de erro problem+json com tradução de mensagens

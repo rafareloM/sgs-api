@@ -92,6 +92,7 @@ source_modules = ["sgs_api.modules.*.domain"]
 forbidden_modules = [
   "sgs_api.core",
   "sgs_api.main",
+  "sgs_api.tools",
   "fastapi",
   "starlette",
   "sqlalchemy",
@@ -125,6 +126,7 @@ source_modules = ["sgs_api.modules.*.application"]
 forbidden_modules = [
   "sgs_api.core",
   "sgs_api.main",
+  "sgs_api.tools",
   "fastapi",
   "starlette",
   "sqlalchemy",
