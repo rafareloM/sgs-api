@@ -37,6 +37,16 @@ make openapi               # regenera contracts/openapi.yaml depois de mudar rot
 
 Para rodar os testes num PostgreSQL já em execução, em vez do testcontainers, defina `SGS_TEST_DATABASE_URL` com o superusuário de um servidor descartável: os testes criam e apagam bancos nele.
 
+## CI e proteção da `main`
+O workflow `.github/workflows/ci.yml` roda em todo PR: dependências travadas, ruff, mypy, import-linter, testes com cobertura (PostgreSQL de serviço), contrato OpenAPI, bandit e pip-audit (job `quality`); depois sobe o compose e chama `/health/ready` pelo proxy TLS (job `compose-smoke`).
+
+Para o merge ficar bloqueado quando algo falha (spec 001, R7.2), a `main` precisa de uma regra de proteção no GitHub (Settings → Branches):
+- exigir pull request com 1 aprovação, descartando aprovações antigas quando chegam commits novos;
+- exigir os checks `quality` e `compose-smoke` verdes, com a branch atualizada;
+- bloquear push direto e force-push, valendo também para administradores.
+
+Em repositório privado, a proteção de branch exige plano Pro ou Team (o GitHub Student Developer Pack inclui o Pro); em repositório público, está disponível no plano gratuito.
+
 ## Comece por aqui
 | Documento | Para quê |
 |---|---|

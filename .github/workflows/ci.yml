@@ -1,3 +1,5 @@
+# Esteira de qualidade (spec 001, R7). Com a proteção da main descrita no README, um PR só
+# entra com os jobs `quality` e `compose-smoke` verdes (R7.2).
 name: CI
 
 on:
@@ -8,9 +10,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17
@@ -22,15 +29,17 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U sgs" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      APP_ENV: test
-      DATABASE_URL: postgresql+asyncpg://sgs:sgs@localhost:5432/sgs_test
+      # Os testes de integração criam e apagam bancos neste servidor, em vez de usar testcontainers.
+      SGS_TEST_DATABASE_URL: postgresql+asyncpg://sgs:sgs@localhost:5432/sgs_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
+          version: "0.11.28"
           python-version: "3.13"
           enable-cache: true
-      - run: uv sync --frozen
+      - name: Dependências travadas
+        run: uv sync --frozen
       - name: Lint e formatação
         run: |
           uv run ruff check .
@@ -39,13 +48,13 @@ jobs:
         run: uv run mypy
       - name: Regras de arquitetura
         run: uv run lint-imports
-      - name: Testes
+      - name: Testes (unidade, integração e arquitetura)
         run: uv run pytest -m "not slow" --cov=src --cov-report=term-missing
       - name: Contrato OpenAPI atualizado
         run: |
           uv run python -m src.tools.export_openapi > /tmp/openapi.yaml
           diff -u contracts/openapi.yaml /tmp/openapi.yaml
-      - name: Segurança
+      - name: SAST e dependências vulneráveis
         run: |
           uv run bandit -q -r src
           uv run pip-audit
@@ -53,9 +62,15 @@ jobs:
   compose-smoke:
     runs-on: ubuntu-latest
     needs: quality
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - run: docker compose -f docker/compose.yml -f docker/compose.test.yml up -d --wait
-      - run: curl -fsSk https://localhost/health/ready
-      - if: always()
+      - uses: actions/checkout@v7
+      - name: Subir api, db e proxy
+        run: docker compose -f docker/compose.yml -f docker/compose.test.yml up -d --build --wait
+      - name: /health/ready pelo proxy TLS
+        run: curl -fsSk --retry 10 --retry-all-errors --retry-delay 2 https://localhost/health/ready
+      - name: Migrações aplicadas na subida (dev)
+        run: docker compose -f docker/compose.yml exec -T api alembic current | grep -q '(head)'
+      - name: Logs
+        if: always()
         run: docker compose -f docker/compose.yml logs --no-color | tail -n 200
