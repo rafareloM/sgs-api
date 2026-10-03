@@ -1,0 +1,22 @@
+# Só o necessário para a imagem da API: pyproject, uv.lock, README, alembic, migrations e src.
+.git
+.github
+.claude
+.venv
+**/__pycache__
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+.env
+.env.*
+secrets/
+contracts/
+docker/
+docs/
+specs/
+steering/
+tests/
+*.md
+!README.md

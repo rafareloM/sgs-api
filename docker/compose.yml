@@ -1,0 +1,70 @@
+# Ambiente local (spec 001, R1.1): API, PostgreSQL e proxy TLS.
+# LDAP, Keycloak e S3 local entram nas specs 004 e 005.
+# Subir: docker compose -f docker/compose.yml up -d --build --wait (ver README).
+# As senhas abaixo são de desenvolvimento; a API recusa iniciar com elas em prod (001/R2.3).
+name: sgs-api
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: sgs
+      POSTGRES_USER: sgs # dono do banco, usado só pelas migrações
+      POSTGRES_PASSWORD: sgs
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username=sgs --dbname=sgs"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      APP_ENV: dev
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: https://localhost:3000
+      # A API conecta como sgs_api (membro de sgs_app); as migrações, como o dono.
+      DATABASE_URL: postgresql+asyncpg://sgs_api:sgs_api@db:5432/sgs
+      DATABASE_MIGRATION_URL: postgresql+asyncpg://sgs:sgs@db:5432/sgs
+      DATABASE_SSL_MODE: disable
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import sys, urllib.request;
+          sys.exit(urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=3).status != 200)
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

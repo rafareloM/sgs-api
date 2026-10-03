@@ -23,7 +23,7 @@
 - [x] T7. Cabeçalhos de segurança, CORS e OpenAPI só fora de prod
   - Requisitos: R6.1, R6.2, R6.3
   - Pronto quando: `tests/integration/test_security_headers.py` passa
-- [ ] T8. Docker compose (api, db, proxy TLS) + README de subida
+- [x] T8. Docker compose (api, db, proxy TLS) + README de subida
   - Requisitos: R1.1, R1.4
   - Pronto quando: job `compose-smoke` do CI fica verde
 - [ ] T9. Workflow de CI completo e proteção de branch

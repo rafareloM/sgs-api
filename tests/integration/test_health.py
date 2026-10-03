@@ -1,4 +1,4 @@
-"""Saúde do processo, identificador de requisição e log de acesso (spec 001, R1.3 e R4)."""
+"""Saúde do processo e do banco, request id e log de acesso (spec 001, R1.3, R1.4 e R4)."""
 
 import json
 import re
@@ -7,9 +7,11 @@ from typing import Any
 import httpx
 import pytest
 from fastapi import FastAPI
+from pydantic import SecretStr
 
 from src.main import create_app
 from tests.factories import make_settings
+from tests.integration.postgres import BancoDeTeste
 
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
@@ -29,6 +31,29 @@ async def test_health_live_responde_200() -> None:
 
     assert resposta.status_code == 200
     assert resposta.json() == {"status": "ok"}
+
+
+async def test_health_ready_responde_200_com_o_banco_no_ar(banco: BancoDeTeste) -> None:
+    """001/R1.4"""
+    app = create_app(make_settings(database_url=SecretStr(banco.url_api)))
+    async with _cliente(app) as cliente:
+        resposta = await cliente.get("/health/ready")
+    await app.state.engine.dispose()
+
+    assert resposta.status_code == 200
+    assert resposta.json() == {"status": "ok"}
+
+
+async def test_health_ready_responde_503_com_o_banco_inacessivel() -> None:
+    """001/R1.4"""
+    app = create_app(make_settings())  # a URL aponta para uma porta sem banco
+    async with _cliente(app) as cliente:
+        resposta = await cliente.get("/health/ready")
+
+    assert resposta.status_code == 503
+    assert resposta.headers["content-type"] == "application/problem+json"
+    assert resposta.json()["title"] == "Serviço indisponível"
+    assert "127.0.0.1" not in resposta.text
 
 
 async def test_gera_request_id_quando_a_requisicao_nao_traz() -> None:

@@ -32,6 +32,10 @@ Hierarquia `AppError(status, type, title)` → `NotFound`, `Forbidden`, `Conflic
 
 ## Docker
 `docker/compose.yml` com serviços `api`, `db` (postgres:17) e `proxy` (Caddy com TLS interno). Os serviços `ldap` (OpenLDAP com seed LDIF), `keycloak` (26.x, realm importado de `docker/keycloak/realm-sgs.json`) e `s3` (SeaweedFS) entram no compose nas specs 004 (T8) e 005 (T8). Override `compose.test.yml` para CI.
+- `docker/Dockerfile`: multi-stage com uv (`uv sync --frozen --no-dev`), usuário sem privilégios, `uvicorn --factory src.main:create_app` com `--proxy-headers`, sem log de acesso do uvicorn nem cabeçalho `Server`.
+- Só o proxy publica portas (80 redireciona para 443); API e banco ficam na rede interna do compose.
+- `docker/postgres/init/01-usuario-app.sql` cria, na primeira subida, o papel `sgs_app` e o login `sgs_api` que a API usa; o dono `sgs` aplica as migrações.
+- `GET /health/ready` faz `SELECT 1` com timeout de 2 s e responde 503 problem+json quando o banco não responde (R1.4); é o healthcheck da API no compose.
 
 ## CI
 Ver `.github/workflows/ci.yml` (modelo já incluso neste pacote).

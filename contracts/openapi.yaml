@@ -25,6 +25,33 @@
           }
         }
       }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "saúde"
+        ],
+        "summary": "A API está pronta: o banco responde",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "O banco de dados não respondeu",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        }
+      }
     }
   },
   "components": {
