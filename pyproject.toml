@@ -58,7 +58,7 @@ known-first-party = ["sgs_api"]
 
 [tool.mypy]
 python_version = "3.13"
-files = ["src", "tests"]
+files = ["src", "tests", "migrations"]
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]

@@ -14,7 +14,7 @@
 - [x] T4. Handlers de erro problem+json com tradução de mensagens
   - Requisitos: R3.1, R3.2, R3.3
   - Pronto quando: `tests/unit/core/test_errors.py` passa
-- [ ] T5. Banco async, Alembic e migração `0001_base` com `audit_log` imutável
+- [x] T5. Banco async, Alembic e migração `0001_base` com `audit_log` imutável
   - Requisitos: R1.2, R5.2
   - Pronto quando: `tests/integration/audit/test_audit_immutable.py` passa
 - [ ] T6. Serviço `audit.registrar` com hash encadeado

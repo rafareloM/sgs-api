@@ -1,14 +1,29 @@
 """Raiz de composição da API: cria o app e liga as camadas dos módulos."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib.metadata import version
 
 from fastapi import FastAPI
 
 from sgs_api.core import health
-from sgs_api.core.config import Settings, load_settings
+from sgs_api.core.config import AppEnv, Settings, load_settings
+from sgs_api.core.db import create_engine, run_migrations
 from sgs_api.core.logging import configure_logging
 from sgs_api.core.problem import install_error_handlers
 from sgs_api.core.request_context import RequestContextMiddleware
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings: Settings = app.state.settings
+    if settings.app_env is AppEnv.DEV and settings.database_migration_url is not None:
+        # Em dev a subida aplica as migrações (R1.2); em test e prod elas são um passo à parte.
+        await run_migrations(settings.database_migration_url.get_secret_value(), settings)
+    try:
+        yield
+    finally:
+        await app.state.engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -16,8 +31,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     configure_logging(settings.log_level)
 
-    app = FastAPI(title="SGS · API de Governança de Dados de Saúde", version=version("sgs-api"))
+    app = FastAPI(
+        title="SGS · API de Governança de Dados de Saúde",
+        version=version("sgs-api"),
+        lifespan=_lifespan,
+    )
     app.state.settings = settings
+    # A engine só abre conexões quando usada; criar o app não exige banco no ar.
+    app.state.engine = create_engine(settings.database_url.get_secret_value(), settings)
     install_error_handlers(app)
     app.include_router(health.router)
     # Adicionado por último para envolver todos os outros middlewares.
