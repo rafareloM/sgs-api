@@ -1,6 +1,6 @@
 # 001 · Fundação da API · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado (Rafael, 03/10/2026)
 - Rastreia: RNF-01, RNF-06, RS-03, RS-05, RS-08, critério 6.1 "sobe em outra máquina"
 
 ## Contexto
@@ -15,7 +15,7 @@ Antes de qualquer funcionalidade, a API precisa de um esqueleto que já nasça c
 ### R1. Subir o ambiente
 Como integrante do grupo, quero subir a API e suas dependências com um comando para desenvolver e demonstrar em qualquer máquina.
 
-- R1.1 QUANDO alguém executa `docker compose up` seguindo o README, o sistema DEVE subir API, PostgreSQL, LDAP, Keycloak, S3 local e proxy TLS.
+- R1.1 QUANDO alguém executa `docker compose up` seguindo o README, o sistema DEVE subir API, PostgreSQL e proxy TLS. LDAP, Keycloak e S3 local entram no compose nas specs 004 e 005.
 - R1.2 O sistema DEVE aplicar as migrações do banco automaticamente na subida em `dev`.
 - R1.3 O sistema DEVE responder `GET /health/live` com 200 sempre que o processo estiver no ar.
 - R1.4 QUANDO o banco estiver inacessível, o sistema DEVE responder `GET /health/ready` com 503.
@@ -51,3 +51,7 @@ Como integrante do grupo, quero subir a API e suas dependências com um comando 
 
 ## Perguntas em aberto
 - Qual integrante é o dono humano desta spec?
+- Campos sensíveis em `changes` devem aparecer como `"***"` (modelo de dados, §3)? Não há requisito na 001; proposta: tratar na 008.
+- Partição mensal e retenção de 2 anos do `audit_log` (modelo de dados e `steering/security.md`) não têm requisito nem tarefa. Entram em qual spec?
+- O teste de contrato com schemathesis (design, "Estratégia de testes") não tem tarefa nesta spec. Entra em qual?
+- O que `DEBUG` deve ligar? Hoje ele só é validado (recusado em prod, R2.3) e não muda o comportamento: a API nunca expõe stack trace (R3.3).

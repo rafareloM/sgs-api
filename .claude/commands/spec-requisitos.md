@@ -6,7 +6,7 @@ Crie ou atualize `specs/$1/requirements.md` a partir de `specs/_templates/requir
 
 Contexto do pedido: $ARGUMENTS
 
-1. Leia `steering/product.md`, `steering/security.md` e `docs/research/02-revisao-criterios.md`.
+1. Leia `steering/product.md` e `steering/security.md`.
 2. Liste as histórias com papel, ação e benefício, usando os papéis de `steering/product.md`.
 3. Escreva critérios EARS numerados (`R1.1`...), cada um testável e sem detalhe de implementação.
 4. Inclua critérios negativos (acesso negado, entrada inválida, falha de integração).

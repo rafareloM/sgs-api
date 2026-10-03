@@ -17,6 +17,7 @@ build/
 !.env.example
 *.pem
 *.key
+*.crt
 secrets/
 
 # Editor / SO

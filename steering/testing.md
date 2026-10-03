@@ -18,4 +18,4 @@
 - Usuários de seed por papel em `tests/fixtures/usuarios.py`, espelhando o LDIF de desenvolvimento.
 
 ## Critérios de aceitação da entrega final
-Os testes de `docs/research/02-revisao-criterios.md` §6 formam a suíte `tests/acceptance/` e devem estar verdes antes de 21/11/2026.
+Os testes dos critérios 6.1 da Entrega Final que dependem do backend formam a suíte `tests/acceptance/` e devem estar verdes antes de 21/11/2026.

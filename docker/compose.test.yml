@@ -1,0 +1,9 @@
+# Ajustes para o smoke test do CI (job compose-smoke): verificações de saúde mais frequentes.
+services:
+  db:
+    healthcheck:
+      interval: 2s
+  api:
+    healthcheck:
+      interval: 2s
+      start_period: 5s

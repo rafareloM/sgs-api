@@ -1,0 +1,6 @@
+# Proxy TLS local (spec 001, R1.1): HTTPS com certificado da CA interna do Caddy.
+# A porta 80 só redireciona para HTTPS. O Caddy repassa X-Forwarded-For e X-Forwarded-Proto.
+localhost {
+	tls internal
+	reverse_proxy api:8000
+}

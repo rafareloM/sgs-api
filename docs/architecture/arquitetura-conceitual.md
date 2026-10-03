@@ -128,7 +128,7 @@ A tabela `group_role_mappings` é o ponto de controle: o Admin TI diz "o grupo `
 Cada módulo segue camadas simples (hexagonal "leve"):
 
 ```
-src/sgs_api/
+src/
   main.py                 # cria o app, registra routers, middlewares, lifespan
   core/                   # config, db, segurança, erros, logging (compartilhado)
   modules/

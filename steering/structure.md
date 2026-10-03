@@ -10,9 +10,10 @@
 │   ├── adr/                  # decisões
 │   └── research/             # pesquisa e revisão de critérios
 ├── contracts/openapi.yaml    # contrato gerado e versionado
-├── src/sgs_api/
-│   ├── main.py               # create_app()
+├── src/                      # código da API, direto aqui; o pacote importável é `src`
+│   ├── main.py               # create_app() e raiz de composição
 │   ├── core/                 # config, db, errors, logging, crypto, security_headers
+│   ├── tools/                # exportação do OpenAPI e comandos de administração
 │   └── modules/
 │       ├── identity/         # usuários, grupos, login, 2FA, tokens, LDAP, OIDC
 │       ├── access/           # RBAC: papéis, permissões, escopo, require()

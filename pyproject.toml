@@ -1,0 +1,165 @@
+[project]
+name = "sgs-api"
+version = "0.1.0"
+description = "API da Plataforma de Governança de Dados de Saúde da Secretaria de Saúde do Recife"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi>=0.142.2,<0.143",
+  "pydantic>=2.13.5,<2.14",
+  "pydantic-settings>=2.15.0,<2.16",
+  "sqlalchemy[asyncio]>=2.1.3,<2.2",
+  "asyncpg>=0.31.0,<0.32",
+  "alembic>=1.20.0,<1.21",
+  "structlog>=26.1.0,<27",
+  "uvicorn>=0.54.0,<0.55",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.16.10,<0.17",
+  "mypy>=2.4.0,<3",
+  "import-linter>=2.15,<3",
+  "pytest>=9.1.1,<10",
+  "pytest-asyncio>=1.4.0,<2",
+  "pytest-cov>=7.1.0,<8",
+  "httpx>=0.28.1,<0.29",
+  "testcontainers>=4.15.0,<5",
+  "hypothesis>=6.168.3,<7",
+  "bandit>=1.9.4,<2",
+  "pip-audit>=2.10.1,<3",
+  "pre-commit>=4.6.2,<5",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.13"]
+build-backend = "uv_build"
+
+# O código fica direto em src/: o pacote importável se chama `src`.
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["."]
+# Trechos de código nas specs e docs são ilustrativos; não são formatados nem verificados.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W", "I", "UP", "B", "S", "ASYNC", "DTZ", "T20",
+  "SIM", "RUF", "PT", "C4", "RET", "PTH", "N",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+# NotFound, Forbidden e Conflict são os nomes definidos no design da spec 001.
+"src/core/errors.py" = ["N818"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "tests"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src", "tests", "migrations"]
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = ["slow: testes ponta a ponta que usam o compose (fora do make check)"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+xfail_strict = true
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.importlinter]
+root_package = "src"
+include_external_packages = true
+
+# Regras de steering/structure.md. Curingas valem para todos os módulos em src.modules.
+[[tool.importlinter.contracts]]
+id = "dominio-puro"
+name = "domain só importa stdlib, pydantic e core.errors"
+type = "forbidden"
+source_modules = ["src.modules.*.domain"]
+forbidden_modules = [
+  "src.core",
+  "src.main",
+  "src.tools",
+  "fastapi",
+  "starlette",
+  "sqlalchemy",
+  "asyncpg",
+  "alembic",
+  "uvicorn",
+  "structlog",
+  "pydantic_settings",
+]
+ignore_imports = ["src.modules.*.domain.** -> src.core.errors"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+id = "dominios-independentes"
+name = "O domain de um módulo não importa o domain de outro"
+type = "independence"
+modules = ["src.modules.*.domain"]
+
+[[tool.importlinter.contracts]]
+id = "camadas-dos-modulos"
+name = "Em cada módulo: api > application > domain"
+type = "layers"
+containers = ["src.modules.*"]
+layers = ["(api)", "(application)", "(domain)"]
+
+[[tool.importlinter.contracts]]
+id = "aplicacao-sem-frameworks"
+name = "application não importa frameworks, drivers nem core (exceto core.errors)"
+type = "forbidden"
+source_modules = ["src.modules.*.application"]
+forbidden_modules = [
+  "src.core",
+  "src.main",
+  "src.tools",
+  "fastapi",
+  "starlette",
+  "sqlalchemy",
+  "asyncpg",
+  "alembic",
+  "uvicorn",
+  "structlog",
+  "pydantic_settings",
+]
+ignore_imports = [
+  "src.modules.*.application.** -> src.core.errors",
+  # O domain pode importar core.errors; a application o alcança por ele.
+  "src.modules.*.domain.** -> src.core.errors",
+]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+id = "infraestrutura-protegida"
+name = "infrastructure só é importada pela raiz de composição"
+type = "protected"
+protected_modules = ["src.modules.*.infrastructure"]
+allowed_importers = ["src.main"]
+
+[[tool.importlinter.contracts]]
+id = "infraestrutura-isolada"
+name = "infrastructure só importa domain, core e bibliotecas"
+type = "forbidden"
+source_modules = ["src.modules.*.infrastructure"]
+forbidden_modules = ["src.modules.*.application", "src.modules.*.api", "src.main"]

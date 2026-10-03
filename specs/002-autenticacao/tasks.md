@@ -1,6 +1,6 @@
 # 002 · Autenticação · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado (Rafael, 03/10/2026)
 - Depende de: 001
 
 - [ ] T1. `FieldCipher` AES-256-GCM com chaves versionadas

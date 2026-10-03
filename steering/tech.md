@@ -18,8 +18,10 @@
 | cryptography | 50.x |
 | structlog | 26.x |
 | openpyxl | 3.1.x |
+| Uvicorn | 0.54.x (ADR-0007) |
+| slowapi | 0.1.x (ADR-0007) |
 
-Ferramentas: uv, ruff, mypy, import-linter, pytest (+ pytest-asyncio, httpx, testcontainers, moto, hypothesis, schemathesis), bandit, pip-audit, pre-commit.
+Ferramentas: uv, ruff, mypy, import-linter, pytest (+ pytest-asyncio, pytest-cov, httpx, testcontainers, moto, hypothesis, schemathesis), bandit, pip-audit, pre-commit. O pytest-cov entrou pelo ADR-0007.
 
 Bibliotecas **proibidas** sem ADR: python-jose, passlib, fastapi-users, SQLModel, MinIO SDK, qualquer ORM além do SQLAlchemy.
 

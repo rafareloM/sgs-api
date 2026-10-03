@@ -11,7 +11,7 @@ test-all:
 	uv run pytest
 
 openapi:
-	uv run python -m sgs_api.tools.export_openapi > contracts/openapi.yaml
+	uv run python -m src.tools.export_openapi > contracts/openapi.yaml
 
 migrate:
 	uv run alembic revision --autogenerate -m "$(m)"
