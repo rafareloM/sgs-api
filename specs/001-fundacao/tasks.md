@@ -2,7 +2,7 @@
 
 - Status: Aprovado (Leonardo, 03/10/2026)
 
-- [ ] T1. Criar projeto com `uv init`, `pyproject.toml`, ruff, mypy, pytest, import-linter e pre-commit
+- [x] T1. Criar projeto com `uv init`, `pyproject.toml`, ruff, mypy, pytest, import-linter e pre-commit
   - Requisitos: R7.1
   - Pronto quando: `uv run ruff check`, `uv run mypy`, `uv run lint-imports` e `uv run pytest` passam no repositório vazio
 - [ ] T2. `core/config.py` com Settings e validações de produção

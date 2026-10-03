@@ -1,0 +1,41 @@
+# Verificações rápidas antes de cada commit. A esteira completa é `make check` e o CI.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+
+  - repo: local
+    hooks:
+      - id: sem-segredos
+        name: bloqueia .env e secrets/
+        language: fail
+        entry: "Arquivos de ambiente e segredos nunca vão para o Git (AGENTS.md, regra 6)."
+        files: '(^|/)(\.env(\.[^/]*)?|secrets/.*)$'
+        exclude: '(^|/)\.env\.example$'
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format --check
+        entry: uv run ruff format --check
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi, toml]
+      - id: lint-imports
+        name: import-linter
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        types_or: [python, toml]
