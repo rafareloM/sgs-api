@@ -53,3 +53,5 @@ Como integrante do grupo, quero subir a API e suas dependências com um comando 
 - Qual integrante é o dono humano desta spec?
 - Campos sensíveis em `changes` devem aparecer como `"***"` (modelo de dados, §3)? Não há requisito na 001; proposta: tratar na 008.
 - Partição mensal e retenção de 2 anos do `audit_log` (modelo de dados e `steering/security.md`) não têm requisito nem tarefa. Entram em qual spec?
+- O teste de contrato com schemathesis (design, "Estratégia de testes") não tem tarefa nesta spec. Entra em qual?
+- O que `DEBUG` deve ligar? Hoje ele só é validado (recusado em prod, R2.3) e não muda o comportamento: a API nunca expõe stack trace (R3.3).
