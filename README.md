@@ -8,7 +8,6 @@ Esta pasta já está organizada como a raiz do futuro repositório: documentaç�
 | Documento | Para quê |
 |---|---|
 | [docs/research/01-pesquisa-stack-backend.md](docs/research/01-pesquisa-stack-backend.md) | Pesquisa da stack: FastAPI, auth, RBAC, LDAP, OIDC, S3, ferramentas |
-| [docs/research/02-revisao-criterios.md](docs/research/02-revisao-criterios.md) | Todos os critérios da documentação mapeados para o backend, com conflitos encontrados |
 | [docs/architecture/arquitetura-conceitual.md](docs/architecture/arquitetura-conceitual.md) | Papéis, recursos, matriz de permissões, componentes, fluxos, rotas |
 | [docs/architecture/modelo-dados.md](docs/architecture/modelo-dados.md) | Tabelas e relacionamentos |
 | [docs/adr/](docs/adr/) | Decisões arquiteturais (ADR-0001 a 0006) |
