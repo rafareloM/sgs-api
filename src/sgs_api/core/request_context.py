@@ -8,11 +8,14 @@ import structlog
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from sgs_api.core.problem import internal_error_response
+
 REQUEST_ID_HEADER = "X-Request-ID"
 # O valor recebido vai para logs e respostas; o formato restrito evita injeção nos logs.
 _VALID_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 _access_log = structlog.get_logger("sgs_api.acesso")
+_error_log = structlog.get_logger("sgs_api.erro")
 
 
 class RequestContextMiddleware:
@@ -29,11 +32,13 @@ class RequestContextMiddleware:
         request_id = _incoming_request_id(scope) or str(uuid.uuid4())
         scope.setdefault("state", {})["request_id"] = request_id
         status_code = 500
+        response_started = False
         started = time.perf_counter()
 
         async def send_with_request_id(message: Message) -> None:
-            nonlocal status_code
+            nonlocal status_code, response_started
             if message["type"] == "http.response.start":
+                response_started = True
                 status_code = message["status"]
                 MutableHeaders(scope=message)[REQUEST_ID_HEADER] = request_id
             await send(message)
@@ -41,6 +46,14 @@ class RequestContextMiddleware:
         with structlog.contextvars.bound_contextvars(request_id=request_id):
             try:
                 await self.app(scope, receive, send_with_request_id)
+            except Exception:
+                # Erro não tratado: detalhes só no log; o cliente recebe um 500 genérico (R3.3).
+                _error_log.exception(
+                    "erro_inesperado", method=scope["method"], route=_route_template(scope)
+                )
+                if response_started:
+                    raise
+                await internal_error_response(request_id)(scope, receive, send_with_request_id)
             finally:
                 # Sem query string nem cabeçalhos: podem carregar tokens (R4.3).
                 _access_log.info(

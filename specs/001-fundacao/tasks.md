@@ -11,7 +11,7 @@
 - [x] T3. `create_app`, rotas de health e middleware de request id + logs JSON
   - Requisitos: R1.3, R4.1, R4.2, R4.3
   - Pronto quando: `tests/integration/test_health.py` e `tests/unit/core/test_logging_redaction.py` passam
-- [ ] T4. Handlers de erro problem+json com tradução de mensagens
+- [x] T4. Handlers de erro problem+json com tradução de mensagens
   - Requisitos: R3.1, R3.2, R3.3
   - Pronto quando: `tests/unit/core/test_errors.py` passa
 - [ ] T5. Banco async, Alembic e migração `0001_base` com `audit_log` imutável
