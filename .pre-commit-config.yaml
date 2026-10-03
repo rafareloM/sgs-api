@@ -4,6 +4,9 @@ repos:
     rev: v6.0.0
     hooks:
       - id: detect-private-key
+      # Mudanças entram na main só por PR (spec 001, R7.2), também na máquina de cada um.
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: check-yaml
