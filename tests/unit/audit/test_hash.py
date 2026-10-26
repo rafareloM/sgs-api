@@ -3,15 +3,18 @@
 import hashlib
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import DomainValidationError
 from src.modules.audit.domain.entry import GENESIS_HASH, Ator, AuditEntry, Entidade, Mudanca
+from src.modules.audit.infrastructure.repository import SqlAuditStore
 
 QUANDO = datetime(2026, 10, 3, 12, 0, 0, 123456, tzinfo=UTC)
 USUARIO = UUID("01928a3b-0000-7000-8000-000000000001")
@@ -46,6 +49,24 @@ def test_hash_e_sha256_do_hash_anterior_mais_o_conteudo_canonico() -> None:
     assert registro.canonical_content() == canonico.encode()
     assert registro.hash == hashlib.sha256((GENESIS_HASH + canonico).encode()).hexdigest()
     assert registro.recompute_hash() == registro.hash
+
+
+def test_registro_isola_estruturas_json_mutaveis() -> None:
+    metadata = {"detalhes": {"marcadores": ["original"]}}
+    valor_anterior = {"itens": [1]}
+    mudanca = Mudanca(campo="dados", de=valor_anterior, para=None)
+    registro = _registro(metadata=metadata, changes=(mudanca,))
+    conteudo_original = registro.canonical_content()
+
+    metadata["detalhes"]["marcadores"].append("alterado")
+    valor_anterior["itens"].append(2)
+
+    assert registro.canonical_content() == conteudo_original
+    assert registro.recompute_hash() == registro.hash
+    with pytest.raises(TypeError):
+        registro.metadata["detalhes"]["novo"] = True
+    with pytest.raises(AttributeError):
+        registro.metadata["detalhes"]["marcadores"].append("alterado")
 
 
 VALORES_JSON = st.recursive(
@@ -89,6 +110,16 @@ def test_registro_adulterado_nao_confere_com_o_hash() -> None:
     adulterado = replace(_registro(), action="unidade.removida")
 
     assert adulterado.recompute_hash() != adulterado.hash
+
+
+async def test_repositorio_recusa_hash_inconsistente() -> None:
+    adulterado = replace(_registro(), metadata={"motivo": "alterado depois do hash"})
+    sessao = AsyncMock()
+
+    with pytest.raises(ValueError, match="hash"):
+        await SqlAuditStore(cast(AsyncSession, sessao)).append(adulterado)
+
+    sessao.execute.assert_not_awaited()
 
 
 def test_mesmo_instante_em_outro_fuso_gera_o_mesmo_hash() -> None:

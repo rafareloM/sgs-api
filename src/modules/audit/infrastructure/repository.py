@@ -21,6 +21,8 @@ class SqlAuditStore:
         return str(last_hash)
 
     async def append(self, entry: AuditEntry) -> None:
+        if entry.recompute_hash() != entry.hash:
+            raise ValueError("O hash do registro de auditoria não corresponde ao conteúdo.")
         content = entry.content()
         await self._session.execute(
             insert(audit_log).values(
