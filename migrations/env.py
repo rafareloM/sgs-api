@@ -16,6 +16,8 @@ from src.core.db import MIGRATION_LOCK_ID, create_engine, metadata
 
 # Registram as tabelas de cada módulo no metadata, para o autogenerate (`make migrate`) vê-las.
 from src.modules.audit.infrastructure import tables as _audit_tables  # noqa: F401
+from src.modules.identity.infrastructure import tables as _identity_tables  # noqa: F401
+from src.modules.registry.infrastructure import tables as _registry_tables  # noqa: F401
 
 config = context.config
 

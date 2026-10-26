@@ -41,6 +41,7 @@
 
 ## Nomes
 - Rotas em português, plural: `/unidades`, `/relatorios`, `/admin/atribuicoes`.
-- Tabelas em inglês, plural: `health_units`, `report_jobs`.
+- Tabelas de negócio da Etapa 02 de Banco de Dados: `perfil`, `unidade_saude`, `usuario`, `equipamento`, `alteracao` (compatíveis com scripts SQL e DDL da disciplina).
+- Tabelas internas da infraestrutura da API: `audit_log`, `audit_chain_head`.
 - Permissões `recurso:acao` em português: `unidade:update`.
 - Ações de auditoria `recurso.verbo_no_passado`: `unidade.atualizada`, `auth.login`.
