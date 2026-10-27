@@ -1,6 +1,6 @@
 # 008 · Histórico de alterações · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RF-08, RS-05, RS-09; critério 6.1 "alteração aparece no histórico com autor, data e hora"; pilar Controle
 
 ## Contexto

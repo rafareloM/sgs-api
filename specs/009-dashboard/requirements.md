@@ -1,6 +1,6 @@
 # 009 · Dashboard básico · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RF-06; critério 6.1 "dashboard exibe indicadores que refletem os dados realmente cadastrados"
 
 ## Contexto

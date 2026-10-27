@@ -25,7 +25,7 @@ class Equipamento:
     nome: str
     tipo: str
     quantidade: int
-    id_unidade: int
+    id_unidade: int | None
     id_equipamento: int | None = None
 
     def __post_init__(self) -> None:

@@ -6,7 +6,7 @@ import pytest
 
 from src.core.errors import DomainValidationError
 from src.modules.registry.domain.equipamento import Equipamento
-from src.modules.registry.domain.unidade import UnidadeSaude
+from src.modules.registry.domain.unidade import UnidadeSaude, normalizar_nome
 
 
 def test_unidade_saude_valida() -> None:
@@ -23,6 +23,10 @@ def test_unidade_saude_valida() -> None:
     assert unidade.codigo_cnes == "1000001"
     assert unidade.tipo == "UBS"
     assert unidade.status == "Ativa"
+
+
+def test_normaliza_nome_para_comparacao_de_unicidade() -> None:
+    assert normalizar_nome("  UBS   São João  ") == "ubs sao joao"
 
 
 @pytest.mark.parametrize("cnes", ["123456", "12345678", "abcdefg", "123 456"])
@@ -110,6 +114,17 @@ def test_equipamento_valido() -> None:
     )
     assert equip.nome == "Respirador UTI"
     assert equip.quantidade == 10
+
+
+def test_equipamento_pode_existir_sem_unidade() -> None:
+    equipamento = Equipamento(
+        nome="UTI móvel",
+        tipo="Respirador",
+        quantidade=1,
+        id_unidade=None,
+    )
+
+    assert equipamento.id_unidade is None
 
 
 def test_equipamento_recusa_tipo_invalido() -> None:

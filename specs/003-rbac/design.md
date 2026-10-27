@@ -1,6 +1,6 @@
 # 003 · RBAC com escopo · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Modelo
 Migração `0003_access`: `roles`, `permissions`, `role_permissions(max_scope)`, `role_assignments`, `group_role_mappings`, mais tabelas de referência necessárias para escopo (`districts`, `technical_areas`) e um stub de `health_units` (id, district_id, unit_type_id) que a spec 006 completa.

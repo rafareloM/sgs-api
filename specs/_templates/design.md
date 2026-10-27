@@ -1,6 +1,6 @@
 # NNN · Nome da funcionalidade · Design
 
-- Status: Rascunho
+- Status: Aprovado
 - Requisitos: requirements.md
 
 ## Visão geral

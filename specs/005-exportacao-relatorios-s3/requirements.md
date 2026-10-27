@@ -1,6 +1,6 @@
 # 005 · Exportação de relatórios para S3 · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RF-07 (parcial), RNF-05, RS-03, RS-04, RS-05, requisito obrigatório "exportação de relatórios para armazenamento em nuvem com mecanismos de autenticação avançados"
 
 ## Contexto

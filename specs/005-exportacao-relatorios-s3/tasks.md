@@ -1,6 +1,6 @@
 # 005 · Exportação de relatórios para S3 · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 001, 003 (escopo de leitura). O gerador de inventário depende de `health_units` (spec 006); até lá, usa o stub da spec 003.
 
 - [ ] T1. Migração `report_jobs` e repositório

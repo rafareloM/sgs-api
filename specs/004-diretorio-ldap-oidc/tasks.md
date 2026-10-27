@@ -1,6 +1,6 @@
 # 004 · Diretório LDAP e OIDC · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 002, 003
 
 - [ ] T1. Migração com `groups`, `user_groups`, `directory_sync_runs` e colunas `source`/`external_id`

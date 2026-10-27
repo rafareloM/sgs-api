@@ -1,0 +1,1 @@
+"""Adaptadores SQL para autorização."""

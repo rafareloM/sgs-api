@@ -1,6 +1,6 @@
 # 006 · Cadastro de unidades, equipamentos e serviços · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RF-01, RF-02, RF-09, RS-02, RS-05, RS-08; critérios 6.1 "cadastrar unidade do início ao fim", "localizar unidade por busca ou filtro"; reunião de 18/09/2026 (unidade × equipamento × serviço, "algo modular")
 
 ## Contexto

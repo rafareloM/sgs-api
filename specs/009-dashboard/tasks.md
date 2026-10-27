@@ -1,6 +1,6 @@
 # 009 · Dashboard básico · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 006, 007, 008
 
 - [ ] T1. Consultas agregadas com escopo e filtros

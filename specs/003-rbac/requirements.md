@@ -1,6 +1,6 @@
 # 003 · RBAC com escopo · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RS-02, RS-05, critérios 6.1 "dois perfis veem e alteram dados diferentes" e "gestor de unidade não edita outra unidade"
 
 ## Contexto

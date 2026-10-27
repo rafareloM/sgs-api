@@ -57,6 +57,8 @@ select = [
 "tests/**" = ["S101"]
 # NotFound, Forbidden e Conflict são os nomes definidos no design da spec 001.
 "src/core/errors.py" = ["N818"]
+# FastAPI uses Depends() as a parameter default for dependency injection.
+"src/modules/access/api/deps.py" = ["B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src", "tests"]

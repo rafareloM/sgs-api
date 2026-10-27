@@ -1,6 +1,6 @@
 # 009 · Dashboard básico · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Implementação
 - Módulo `dashboard` só lê; consultas `GROUP BY` com `scope_filter` aplicado (spec 003). Sem tabela própria (Atividade 5 §4).
@@ -25,3 +25,7 @@
 ## Estratégia de testes
 - Integração: cadastrar N unidades com a spec 006 e conferir cada número (teste de aceitação 6.1); escopo reduz os totais; filtros.
 - Desempenho (`slow`): 1.000 unidades, p95 < 1 s.
+
+
+## REVISÃO DE CONTRATO (ETAPA 03)
+O dashboard consumirá as tabelas legadas em português (UNIDADE_SAUDE, EQUIPAMENTO, ALTERACAO).

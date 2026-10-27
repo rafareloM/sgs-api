@@ -14,6 +14,11 @@ from src.core.logging import configure_logging
 from src.core.problem import install_error_handlers
 from src.core.request_context import RequestContextMiddleware
 from src.core.security_headers import SecurityHeadersMiddleware
+from src.modules.access.infrastructure.repository import SqlAccessRepository
+from src.modules.dashboard.api.rotas import router as dashboard_router
+from src.modules.dashboard.infrastructure.repository import SqlDashboardRepository
+from src.modules.registry.api.rotas_etapa3 import router as registry_router
+from src.modules.registry.infrastructure.raw_repository import SqlEtapa3Repository
 
 
 @asynccontextmanager
@@ -46,8 +51,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # A engine só abre conexões quando usada; criar o app não exige banco no ar.
     app.state.engine = create_engine(settings.database_url.get_secret_value(), settings)
+    app.state.access_repository_factory = SqlAccessRepository
+    app.state.etapa3_repository_factory = SqlEtapa3Repository
+    app.state.dashboard_repository_factory = SqlDashboardRepository
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(registry_router)
+    app.include_router(dashboard_router)
 
     # O último middleware adicionado é o mais externo: contexto > cabeçalhos > CORS > rotas.
     app.add_middleware(
@@ -55,7 +65,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=list(settings.cors_origins),  # só as origens configuradas (R6.2)
         allow_credentials=True,  # o refresh token da 002 viaja em cookie
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-Request-ID"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            "X-Request-ID",
+            "X-User-Id",
+        ],
         expose_headers=["X-Request-ID"],
         max_age=600,
     )

@@ -1,6 +1,6 @@
 # 008 · Histórico de alterações · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Consulta
 - `audit/application/consultar.py` monta a query sobre `audit_log` com índices `(entity_type, entity_id, occurred_at DESC)` e `(action, occurred_at DESC)`.

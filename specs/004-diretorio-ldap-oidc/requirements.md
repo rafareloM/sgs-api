@@ -1,6 +1,6 @@
 # 004 · Diretório LDAP e OIDC · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RS-01, RS-02, RS-03, RS-05, RS-08, requisito obrigatório "consumo de credenciais via LDAP e OIDC para popular as tabelas locais dos usuários e grupos"
 
 ## Contexto

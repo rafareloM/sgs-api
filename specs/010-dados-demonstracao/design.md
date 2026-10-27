@@ -1,6 +1,6 @@
 # 010 · Dados de demonstração · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Formato
 Arquivos YAML em `seeds/demo/` (`referencias.yaml`, `unidades.yaml`, `usuarios.yaml`), validados pelos mesmos schemas Pydantic da API. A carga passa pelos casos de uso (spec 006), garantindo que dados de seed respeitam as regras de validação e geram auditoria com o ator `sistema-seed`.

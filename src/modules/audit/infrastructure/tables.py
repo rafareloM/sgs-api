@@ -57,6 +57,7 @@ alteracao = Table(
     Column("campoalterado", String(50), nullable=False),
     Column("valoranterior", String(255), nullable=True),
     Column("valornovo", String(255), nullable=True),
+    Column("motivo", String(255), nullable=True),
     Column(
         "idunidade",
         Integer,

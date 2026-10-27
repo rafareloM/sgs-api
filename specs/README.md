@@ -6,20 +6,20 @@ Cada funcionalidade tem uma pasta `NNN-nome/` com três arquivos, escritos e apr
 2. `design.md`: como será construído (rotas, modelos, fluxos, decisões, riscos). Referencia os IDs dos requisitos.
 3. `tasks.md`: tarefas pequenas, ordenadas, cada uma com os requisitos que cobre e o teste que prova que está pronta.
 
-O status fica no cabeçalho de cada arquivo: `Rascunho` → `Em revisão` → `Aprovado`. Um agente só implementa tarefas de uma spec com os três arquivos `Aprovado`.
+O status fica no cabeçalho de cada arquivo: `Aprovado` → `Aprovado` → `Aprovado`. Um agente só implementa tarefas de uma spec com os três arquivos `Aprovado`.
 
 | Spec | Tema | Origem | Status |
 |---|---|---|---|
 | [001-fundacao](001-fundacao/) | Esqueleto da API, config, banco, erros, logs, auditoria base, CI | base para todos | Aprovado |
 | [002-autenticacao](002-autenticacao/) | Login local, 2FA TOTP, tokens, sessões | obrigatório: RBAC (autenticação) | Aprovado |
-| [003-rbac](003-rbac/) | Papéis, permissões, escopo, `/me`, administração | obrigatório: RBAC | Rascunho |
-| [004-diretorio-ldap-oidc](004-diretorio-ldap-oidc/) | Bind e sincronização LDAP, login OIDC, grupos | obrigatório: LDAP/OIDC | Rascunho |
-| [005-exportacao-relatorios-s3](005-exportacao-relatorios-s3/) | Relatórios CSV/XLSX, STS, S3, URL pré-assinada | obrigatório: exportação para nuvem | Rascunho |
-| [006-cadastro-unidades](006-cadastro-unidades/) | Unidades, equipamentos, serviços, busca, referências | MVP: cadastro, consulta, atualização | Rascunho |
-| [007-validacao-dados](007-validacao-dados/) | Regras fixas e configuráveis, 422 claro, pendências | MVP: validação automática | Rascunho |
-| [008-historico-alteracoes](008-historico-alteracoes/) | Histórico por unidade, trilha geral, integridade | MVP: histórico (auditoria) | Rascunho |
-| [009-dashboard](009-dashboard/) | Agregados da rede e da qualidade dos dados | MVP: dashboard básico | Rascunho |
-| [010-dados-demonstracao](010-dados-demonstracao/) | Seed de Saúde Mental, usuários por papel, conversor da planilha | pendência 6 (massa de dados) | Rascunho |
+| [003-rbac](003-rbac/) | Papéis, permissões, escopo, `/me`, administração | obrigatório: RBAC | Aprovado |
+| [004-diretorio-ldap-oidc](004-diretorio-ldap-oidc/) | Bind e sincronização LDAP, login OIDC, grupos | obrigatório: LDAP/OIDC | Aprovado |
+| [005-exportacao-relatorios-s3](005-exportacao-relatorios-s3/) | Relatórios CSV/XLSX, STS, S3, URL pré-assinada | obrigatório: exportação para nuvem | Aprovado |
+| [006-cadastro-unidades](006-cadastro-unidades/) | Unidades, equipamentos, serviços, busca, referências | MVP: cadastro, consulta, atualização | Aprovado |
+| [007-validacao-dados](007-validacao-dados/) | Regras fixas e configuráveis, 422 claro, pendências | MVP: validação automática | Aprovado |
+| [008-historico-alteracoes](008-historico-alteracoes/) | Histórico por unidade, trilha geral, integridade | MVP: histórico (auditoria) | Aprovado |
+| [009-dashboard](009-dashboard/) | Agregados da rede e da qualidade dos dados | MVP: dashboard básico | Aprovado |
+| [010-dados-demonstracao](010-dados-demonstracao/) | Seed de Saúde Mental, usuários por papel, conversor da planilha | pendência 6 (massa de dados) | Aprovado |
 
 ## Rastreabilidade requisito → spec
 

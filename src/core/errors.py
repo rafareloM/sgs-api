@@ -47,6 +47,12 @@ class Conflict(AppError):
     title = "Conflito"
 
 
+class PreconditionFailed(AppError):
+    status = 412
+    type = "urn:sgs:problema:precondicao-falhou"
+    title = "Versão desatualizada"
+
+
 class DomainValidationError(AppError):
     status = 422
     type = "urn:sgs:problema:validacao"

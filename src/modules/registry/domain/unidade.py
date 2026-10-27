@@ -1,6 +1,7 @@
 """Entidade UnidadeSaude (Etapa 02 - Banco de Dados)."""
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -17,9 +18,14 @@ TIPOS_UNIDADE_VALIDOS = frozenset(
 STATUS_UNIDADE_VALIDOS = frozenset({"Ativa", "Inativa", "Em reforma", "Suspensa"})
 
 
+def normalizar_nome(nome: str) -> str:
+    sem_acentos = unicodedata.normalize("NFKD", nome)
+    return " ".join(sem_acentos.encode("ascii", "ignore").decode("ascii").casefold().split())
+
+
 @dataclass(frozen=True)
 class UnidadeSaude:
-    codigo_cnes: str
+    codigo_cnes: str | None
     nome: str
     tipo: str
     endereco: str
@@ -34,7 +40,7 @@ class UnidadeSaude:
     def __post_init__(self) -> None:
         errors: list[FieldError] = []
 
-        if not self.codigo_cnes or not CNES_REGEX.fullmatch(self.codigo_cnes):
+        if self.codigo_cnes is not None and not CNES_REGEX.fullmatch(self.codigo_cnes):
             errors.append(
                 FieldError(
                     campo="codigo_cnes",

@@ -74,7 +74,7 @@ class SqlUnidadeSaudeRepository:
     def _to_domain(self, row: RowMapping) -> UnidadeSaude:
         return UnidadeSaude(
             id_unidade=int(row["idunidade"]),
-            codigo_cnes=str(row["codigocnes"]),
+            codigo_cnes=str(row["codigocnes"]) if row["codigocnes"] is not None else None,
             nome=str(row["nome"]),
             tipo=str(row["tipo"]),
             endereco=str(row["endereco"]),

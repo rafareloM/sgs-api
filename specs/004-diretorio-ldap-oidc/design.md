@@ -1,6 +1,6 @@
 # 004 · Diretório LDAP e OIDC · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Portas e adaptadores
 ```python

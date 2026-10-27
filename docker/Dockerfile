@@ -16,6 +16,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 # alembic.ini e migrations/ para aplicar as migrações na subida em dev.
 COPY alembic.ini ./
 COPY migrations ./migrations
+COPY consultas_etapa3.sql ./consultas_etapa3.sql
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
