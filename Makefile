@@ -1,4 +1,4 @@
-.PHONY: check test-all openapi migrate up down
+.PHONY: check test-all openapi migrate seed up down
 
 check:
 	uv run ruff check .
@@ -15,6 +15,9 @@ openapi:
 
 migrate:
 	uv run alembic revision --autogenerate -m "$(m)"
+
+seed:
+	uv run python -m src.tools.seed_db
 
 up:
 	docker compose -f docker/compose.yml up -d

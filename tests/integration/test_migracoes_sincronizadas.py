@@ -10,7 +10,9 @@ from alembic.migration import MigrationContext
 from sqlalchemy import Connection
 
 from src.core.db import metadata
-from src.modules.audit.infrastructure import tables  # noqa: F401 - registra as tabelas
+from src.modules.audit.infrastructure import tables as _audit_tables  # noqa: F401
+from src.modules.identity.infrastructure import tables as _identity_tables  # noqa: F401
+from src.modules.registry.infrastructure import tables as _registry_tables  # noqa: F401
 from tests.integration.postgres import BancoDeTeste, motor
 
 

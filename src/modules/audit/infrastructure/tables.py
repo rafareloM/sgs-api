@@ -6,7 +6,9 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    ForeignKey,
     Identity,
+    Integer,
     SmallInteger,
     String,
     Table,
@@ -45,4 +47,39 @@ audit_chain_head = Table(
     Column("id", SmallInteger, primary_key=True, autoincrement=False),
     Column("last_hash", CHAR(64), nullable=False),
     CheckConstraint("id = 1", name="linha_unica"),
+)
+
+alteracao = Table(
+    "alteracao",
+    metadata,
+    Column("idalteracao", Integer, Identity(always=True), primary_key=True),
+    Column("datahora", DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+    Column("campoalterado", String(50), nullable=False),
+    Column("valoranterior", String(255), nullable=True),
+    Column("valornovo", String(255), nullable=True),
+    Column(
+        "idunidade",
+        Integer,
+        ForeignKey(
+            "unidade_saude.idunidade",
+            onupdate="CASCADE",
+            name="fk_alteracao_idunidade_unidade_saude",
+        ),
+        nullable=False,
+    ),
+    Column(
+        "idusuario",
+        Integer,
+        ForeignKey(
+            "usuario.idusuario",
+            onupdate="CASCADE",
+            name="fk_alteracao_idusuario_usuario",
+        ),
+        nullable=False,
+    ),
+    CheckConstraint("btrim(campoalterado) <> ''", name="ck_alteracao_campoalterado_nao_vazio"),
+    CheckConstraint(
+        "valoranterior IS NOT NULL OR valornovo IS NOT NULL",
+        name="ck_alteracao_valores_nao_ambos_nulos",
+    ),
 )

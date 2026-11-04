@@ -12,6 +12,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Any, Self
 from uuid import UUID
 
@@ -22,6 +23,31 @@ GENESIS_HASH = "0" * 64
 # Ações no formato recurso.verbo (steering/structure.md): unidade.atualizada, auth.login.
 _ACTION = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*")
 _HASH = re.compile(r"[0-9a-f]{64}")
+
+
+def _freeze_json(value: Any, parents: set[int] | None = None) -> Any:
+    if not isinstance(value, Mapping | list | tuple):
+        return value
+    parents = parents if parents is not None else set()
+    identity = id(value)
+    if identity in parents:
+        raise _invalid("mudancas", "Os valores JSON não podem conter referências cíclicas.")
+    parents.add(identity)
+    try:
+        if isinstance(value, Mapping):
+            frozen = {key: _freeze_json(item, parents) for key, item in value.items()}
+            return MappingProxyType(frozen)
+        return tuple(_freeze_json(item, parents) for item in value)
+    finally:
+        parents.remove(identity)
+
+
+def _thaw_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_thaw_json(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True)
@@ -57,6 +83,10 @@ class Mudanca:
     de: Any
     para: Any
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "de", _freeze_json(self.de))
+        object.__setattr__(self, "para", _freeze_json(self.para))
+
 
 @dataclass(frozen=True)
 class AuditEntry:
@@ -68,6 +98,10 @@ class AuditEntry:
     metadata: Mapping[str, Any] = field(default_factory=dict)
     prev_hash: str = GENESIS_HASH
     hash: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "changes", tuple(self.changes))
+        object.__setattr__(self, "metadata", _freeze_json(dict(self.metadata)))
 
     @classmethod
     def create(
@@ -110,8 +144,11 @@ class AuditEntry:
             "action": self.action,
             "entity_type": self.entity.tipo if self.entity else None,
             "entity_id": self.entity.id if self.entity else None,
-            "changes": [{"campo": m.campo, "de": m.de, "para": m.para} for m in self.changes],
-            "metadata": dict(self.metadata),
+            "changes": [
+                {"campo": m.campo, "de": _thaw_json(m.de), "para": _thaw_json(m.para)}
+                for m in self.changes
+            ],
+            "metadata": _thaw_json(self.metadata),
         }
 
     def canonical_content(self) -> bytes:
