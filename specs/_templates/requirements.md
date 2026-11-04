@@ -1,6 +1,6 @@
 # NNN · Nome da funcionalidade · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RF-.., RS-..
 - Dono humano: <nome>
 

@@ -119,7 +119,7 @@ async def test_integridade_on_update_cascade(banco: BancoDeTeste) -> None:
                 nome="Equip Cascade",
                 tipo="Respirador",
                 quantidade=2,
-                id_unidade=u.id_unidade,  # type: ignore[arg-type]
+                id_unidade=u.id_unidade,
             )
         )
         await session.commit()

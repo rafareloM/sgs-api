@@ -1,14 +1,14 @@
 # 006 · Cadastro de unidades, equipamentos e serviços · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Módulo
 `modules/registry`. Usa `access` (require/scope_filter) e `audit` (registrar).
 
 ## Modelo
-Migração `0006_registry` completa as tabelas de `docs/architecture/modelo-dados.md` §2: `districts`, `technical_areas`, `unit_types`, `equipment_types`, `service_types`, `health_units`, `equipments`, `services`. Acréscimos:
-- `health_units.version` (int) para ETag/`If-Match` (R3.2).
-- `health_units.name_normalized` gerado por `unaccent(lower(regexp_replace(name,'\s+',' ','g')))`; índice único (`district_id`, `name_normalized`) (R1.4).
+Migração `0006_registry` completa as tabelas de `docs/architecture/modelo-dados.md` §2: `districts`, `technical_areas`, `unit_types`, `equipment_types`, `service_types`, `UNIDADE_SAUDE`, `EQUIPAMENTO`, `services`. Acréscimos:
+- `UNIDADE_SAUDE.version` (int) para ETag/`If-Match` (R3.2).
+- `UNIDADE_SAUDE.name_normalized` gerado por `unaccent(lower(regexp_replace(name,'\s+',' ','g')))`; índice único (`district_id`, `name_normalized`) (R1.4).
 - Índice único parcial em `cnes WHERE cnes IS NOT NULL` (R1.3).
 - Extensão `pg_trgm` + índice GIN em `name_normalized` para busca (R2.2, R2.7).
 
@@ -44,3 +44,7 @@ Função pura `diff(antes: dict, depois: dict) -> list[Mudanca]` no domínio; o 
 - Unidade: normalização de nome, diff, regra de campos estruturais.
 - Integração: criação completa; 409 por CNES e por nome; filtros combinados; escopo (gestor da unidade A → 403 na B); `If-Match` desatualizado → 412; PATCH sem mudança não audita; renomear unidade reflete em serviços.
 - Desempenho: teste `slow` com 1.000 unidades verificando p95 < 3 s na busca.
+
+
+## REVISÃO DE CONTRATO (ETAPA 03)
+Fica formalmente decidido que o schema obrigatório de banco de dados utilizará as tabelas legadas em português da Etapa 02 (UNIDADE_SAUDE, EQUIPAMENTO, ALTERACAO, USUARIO, PERFIL), revogando qualquer nomenclatura em inglês anterior. O CRUD de EQUIPAMENTO usará exclusão física (DELETE) por não possuir status, e UNIDADE_SAUDE usará desativação lógica (PATCH Status = Inativa). Autorização e auditoria usarão as tabelas USUARIO e ALTERACAO reais.

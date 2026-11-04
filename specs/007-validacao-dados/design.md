@@ -1,6 +1,6 @@
 # 007 · Validação de dados · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Camadas de validação
 1. **Formato (Pydantic, camada `api`)**: tipos, tamanhos, normalização (`BeforeValidator` remove máscara) e formatos fixos de R1.3. Erros viram 422 via handler da spec 001.

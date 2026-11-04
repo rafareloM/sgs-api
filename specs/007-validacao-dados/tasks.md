@@ -1,6 +1,6 @@
 # 007 · Validação de dados · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 006
 
 - [ ] T1. Normalizadores e validadores de formato (CNES, CEP, telefone, coordenadas, horário) nos schemas

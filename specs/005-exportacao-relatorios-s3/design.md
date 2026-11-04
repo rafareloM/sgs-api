@@ -1,6 +1,6 @@
 # 005 · Exportação de relatórios para S3 · Design
 
-- Status: Rascunho
+- Status: Aprovado
 
 ## Portas
 ```python

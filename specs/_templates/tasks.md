@@ -1,6 +1,6 @@
 # NNN · Nome da funcionalidade · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 
 Cada tarefa: pequena (até ~300 linhas de diff), testável, com os requisitos que cobre. Marque `[x]` só quando o teste citado passar no CI.
 

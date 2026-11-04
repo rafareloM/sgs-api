@@ -1,6 +1,6 @@
 # 006 · Cadastro de unidades, equipamentos e serviços · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 001, 003
 
 - [ ] T1. Migração `0006_registry` com referências, índices (`pg_trgm`, `unaccent`, únicos parciais) e seed das referências

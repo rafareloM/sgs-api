@@ -1,0 +1,1 @@
+"""Dependências HTTP de autorização."""

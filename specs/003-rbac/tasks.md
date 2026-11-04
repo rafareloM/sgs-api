@@ -1,6 +1,6 @@
 # 003 · RBAC com escopo · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 002
 
 - [ ] T1. Migração `0003_access` com seed da matriz de papéis e permissões

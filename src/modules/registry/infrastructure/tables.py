@@ -2,6 +2,7 @@
 
 from sqlalchemy import (
     CHAR,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Table,
+    UniqueConstraint,
     text,
 )
 
@@ -19,7 +21,7 @@ unidade_saude = Table(
     "unidade_saude",
     metadata,
     Column("idunidade", Integer, Identity(always=True), primary_key=True),
-    Column("codigocnes", String(7), nullable=False, unique=True),
+    Column("codigocnes", String(7), nullable=True, unique=True),
     Column("nome", String(150), nullable=False),
     Column("tipo", String(50), nullable=False),
     Column("endereco", String(200), nullable=False),
@@ -29,6 +31,9 @@ unidade_saude = Table(
     Column("status", String(20), nullable=False),
     Column("datacriacao", DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
     Column("dataatualizacao", DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+    Column("cnes_pendente", Boolean, nullable=False, server_default=text("false")),
+    Column("versao", Integer, nullable=False, server_default=text("1")),
+    Column("nomenormalizado", String(150), nullable=False),
     CheckConstraint("codigocnes ~ '^[0-9]{7}$'", name="ck_unidade_saude_codigocnes_formato"),
     CheckConstraint("btrim(nome) <> ''", name="ck_unidade_saude_nome_nao_vazio"),
     CheckConstraint(
@@ -50,6 +55,12 @@ unidade_saude = Table(
         name="ck_unidade_saude_status_valido",
     ),
     CheckConstraint("dataatualizacao >= datacriacao", name="ck_unidade_saude_datas_consistentes"),
+    CheckConstraint("versao > 0", name="ck_unidade_saude_versao_positiva"),
+    UniqueConstraint(
+        "distritosanitario",
+        "nomenormalizado",
+        name="uq_unidade_saude_distrito_nome_normalizado",
+    ),
 )
 
 equipamento = Table(
@@ -67,7 +78,7 @@ equipamento = Table(
             onupdate="CASCADE",
             name="fk_equipamento_idunidade_unidade_saude",
         ),
-        nullable=False,
+        nullable=True,
     ),
     CheckConstraint("btrim(nome) <> ''", name="ck_equipamento_nome_nao_vazio"),
     CheckConstraint(

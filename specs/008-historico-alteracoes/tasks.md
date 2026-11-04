@@ -1,6 +1,6 @@
 # 008 · Histórico de alterações · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 001, 003, 006
 
 - [ ] T1. Índices e consulta paginada com filtros

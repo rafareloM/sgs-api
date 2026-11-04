@@ -1,6 +1,6 @@
 # 007 · Validação de dados · Requisitos
 
-- Status: Rascunho
+- Status: Aprovado
 - Rastreia: RF-03, RS-08; critério 6.1 "dado inválido gera mensagem clara e não é gravado"; pilar Confiabilidade
 
 ## Contexto

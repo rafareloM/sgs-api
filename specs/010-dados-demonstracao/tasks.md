@@ -1,6 +1,6 @@
 # 010 · Dados de demonstração · Tarefas
 
-- Status: Rascunho
+- Status: Aprovado
 - Depende de: 006, 007
 
 - [ ] T1. Arquivos YAML de demonstração (Saúde Mental + casos especiais + pendências)
