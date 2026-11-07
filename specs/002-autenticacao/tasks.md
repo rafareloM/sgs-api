@@ -4,6 +4,7 @@
 - Depende de: 001
 - Ajuste (Rafael, 06/11/2026): a T4 e a T5 passam a ligar as próprias chaves ao `Settings`. Responde à pergunta registrada na T1: nenhuma tarefa cuidava disso.
 - Ajuste (Rafael, 06/11/2026, revisão do PR #16): a migração da T2 já traz as colunas da R2.6 (`users.mfa_challenge_jti` e `users.mfa_failed_attempts`; ver design, Decisões), que a T5 usa. A T8 grava a auditoria da criação do usuário.
+- Ajuste (Rafael, 07/11/2026, `/implement-spec` da 011): a T4 entra na execução das specs 003, 006 e 011 como bloqueio da 003/T4 e da 003/T6, que precisam do usuário autenticado. O `CurrentUser` do design (`api/deps.py`), que nenhuma tarefa daqui entregava, sai na 003/T4.
 
 - [x] T1. `FieldCipher` AES-256-GCM com chaves versionadas
   - Requisitos: R2.5
@@ -14,7 +15,9 @@
 - [ ] T3. `PasswordHasher` Argon2id e caso de uso de login com hash fictício e bloqueio
   - Requisitos: R1.1, R1.2, R1.3, R1.4, R1.6
   - Pronto quando: `tests/integration/identity/test_login.py` passa
-- [ ] T4. `TokenService` ES256 + JWKS, com as chaves de assinatura (`JWT_PRIVATE_KEYS`) no `Settings`
+- [x] T4. `TokenService` ES256 + JWKS, com as chaves de assinatura (`JWT_PRIVATE_KEYS`) no `Settings`
+  - Bloqueada por: nenhuma
+  - Bloqueia: 003/T4 e 003/T6
   - Requisitos: R3.1, R3.2, R3.8; 001/R2.2 e R2.3 para as chaves
   - Pronto quando: `tests/unit/identity/test_tokens.py` passa e `tests/unit/core/test_config.py` cobre as chaves JWT (ausentes ou inválidas recusam a subida; chave de exemplo recusada em prod)
 - [ ] T5. Cadastro e verificação de TOTP, com `CRYPTO_KEYS` e `CRYPTO_ACTIVE_KEY` no `Settings` para montar o `FieldCipher`

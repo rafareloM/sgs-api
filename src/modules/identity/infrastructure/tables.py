@@ -64,6 +64,8 @@ users = Table(
     Column("locked_until", DateTime(timezone=True), nullable=True),
     Column("last_login_at", DateTime(timezone=True), nullable=True),
     Column("synced_at", DateTime(timezone=True), nullable=True),
+    # 003/R4.5: incrementada a cada alteração das atribuições; invalida o cache de permissões.
+    Column("authz_version", Integer, nullable=False, server_default=text("0")),
     *_timestamps(),
     UniqueConstraint("source", "external_id"),
     CheckConstraint("source IN ('local', 'ldap', 'oidc')", name="origem_valida"),

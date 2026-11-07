@@ -6,6 +6,7 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.core import health
 from src.core.config import AppEnv, Settings, load_settings
@@ -14,6 +15,19 @@ from src.core.logging import configure_logging
 from src.core.problem import install_error_handlers
 from src.core.request_context import RequestContextMiddleware
 from src.core.security_headers import SecurityHeadersMiddleware
+from src.modules.access.application.permissoes import ResolvedorDePermissoes
+from src.modules.access.infrastructure.repository import (
+    SqlRepositorioDePermissoes,
+    SqlResolvedorDeUnidade,
+)
+from src.modules.audit.infrastructure.repository import SqlAuditStore
+from src.modules.dashboard.api import rotas as dashboard
+from src.modules.dashboard.infrastructure.consultas import SqlConsultasDashboard
+from src.modules.identity.api import jwks
+from src.modules.identity.infrastructure.repository import SqlSessionRepository, SqlUserRepository
+from src.modules.identity.infrastructure.tokens import JwtTokenService
+from src.modules.registry.api import unidades
+from src.modules.registry.infrastructure.repository import SqlRepositorioDeUnidades
 
 
 @asynccontextmanager
@@ -46,8 +60,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # A engine só abre conexões quando usada; criar o app não exige banco no ar.
     app.state.engine = create_engine(settings.database_url.get_secret_value(), settings)
+    app.state.sessoes = async_sessionmaker(app.state.engine, expire_on_commit=False)
+    app.state.token_service = JwtTokenService.from_settings(settings)
+    # Fábricas de repositórios: recebem a sessão SQLAlchemy de quem as usa (a camada api não
+    # importa a infrastructure; design da 002, Decisões).
+    app.state.repositorio_de_usuarios = SqlUserRepository
+    app.state.repositorio_de_sessoes = SqlSessionRepository
+    app.state.repositorio_de_permissoes = SqlRepositorioDePermissoes
+    app.state.auditoria = SqlAuditStore
+    app.state.repositorio_de_unidades = SqlRepositorioDeUnidades
+    app.state.consultas_dashboard = SqlConsultasDashboard
+    # Um resolvedor por processo: o cache de permissões é dele (design da 003, passo 3).
+    app.state.resolvedor_de_permissoes = ResolvedorDePermissoes()
+    # `ResourceRef.tipo` → fábrica do `ResolvedorDeAlvo` daquele tipo de recurso (design da 003,
+    # § Verificação).
+    app.state.resolvedores_de_alvo = {"unidade": SqlResolvedorDeUnidade}
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(jwks.router)
+    app.include_router(unidades.router)
+    app.include_router(dashboard.router)
 
     # O último middleware adicionado é o mais externo: contexto > cabeçalhos > CORS > rotas.
     app.add_middleware(

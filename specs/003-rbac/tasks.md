@@ -2,22 +2,24 @@
 
 - Status: Aprovado (Rafael, 07/11/2026; aprovação só do dono pela exceção provisória de `steering/sdd-workflow.md`)
 - Depende de: 002
+- Ajuste (Rafael, 07/11/2026, `/implement-spec` da 011): a T4 e a T6 precisam do usuário autenticado. A T4 passa a ser bloqueada pela 002/T4 (`TokenService`) e entrega o `CurrentUser` da 002 (`identity/api/deps.py`: valida o Bearer, carrega a sessão ativa e o usuário ativo); a T6 espera a T4.
 
-- [ ] T1. Migração `0003_access` com seed da matriz de papéis e permissões
+- [x] T1. Migração `0003_access` com seed da matriz de papéis e permissões
   - Bloqueada por: nenhuma (002/T2 já na `main`)
   - Requisitos: R1.1, R1.2, R1.3
   - Pronto quando: `tests/integration/access/test_seed_matriz.py` passa
-- [ ] T2. Função de domínio `pode()` e tipos de escopo
+- [x] T2. Função de domínio `pode()` e tipos de escopo
   - Bloqueada por: nenhuma
   - Requisitos: R4.2, R4.3
   - Pronto quando: `tests/unit/access/test_pode_matriz.py` (parametrizado pela matriz) passa
-- [ ] T3. Resolução de permissões efetivas com cache e `authz_version`
+- [x] T3. Resolução de permissões efetivas com cache e `authz_version`
   - Bloqueada por: T1, T2
   - Requisitos: R4.5
   - Pronto quando: `tests/integration/access/test_permissoes_efetivas.py` passa
-- [ ] T4. Dependência `require()` e `scope_filter()`
+- [x] T4. Dependência `require()` e `scope_filter()`
   - Inclui `escopo_de_leitura(usuario, perm) -> EscopoLeitura` para o SQL escrito à mão (emenda da 011).
-  - Bloqueada por: T3
+  - Inclui o `CurrentUser` da 002 (`identity/api/deps.py`); `test_require.py` cobre 401 sem Bearer, com token inválido e com sessão revogada.
+  - Bloqueada por: T3, 002/T4
   - Requisitos: R4.1, R4.3, R4.4, R4.6
   - Pronto quando: `tests/integration/access/test_require.py` passa
 - [ ] T5. Teste de arquitetura de rotas protegidas
@@ -25,7 +27,7 @@
   - Requisitos: R4.1
   - Pronto quando: `tests/architecture/test_rotas_protegidas.py` passa
 - [ ] T6. `GET /me`
-  - Bloqueada por: T3
+  - Bloqueada por: T3, T4 (`CurrentUser`)
   - Requisitos: R5.1
   - Pronto quando: `tests/integration/access/test_me.py` passa
 - [ ] T7. Rotas de administração de atribuições com validação de escopo e auditoria

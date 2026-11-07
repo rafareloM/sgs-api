@@ -68,3 +68,12 @@ Como Gestor de Unidade (ou técnico do distrito), quero corrigir os dados da min
 ## Perguntas em aberto
 - Lista oficial de distritos sanitários e tipos de unidade (pedir ao Sérgio a aba de convenções da planilha).
 - Campos estruturais (R3.4) estão corretos para o fluxo da Secretaria?
+- **Tipos de equipamento e de serviço (achado na T1):** sem lista oficial, a 0006 semeia só os exemplos de `steering/product.md` e do modelo de dados: equipamento `UTI_MOVEL`, `MATERNIDADE` e `POLICLINICA`; serviço `FARMACIA`, `FARMACIA_FAMILIA`, `SALA_VACINA` e `ESPACO_MAE_CORUJA`. Os distritos (DS-I a DS-VIII) e os tipos de unidade seguem a pergunta acima. Confirmar com o cliente junto com ela; o Gestor de Dados ajusta pela API (R7.2).
+- (006/T3) Como o 409 "indica a unidade existente" (R1.3)? (padrão adotado: membro de extensão `unidade_existente_id` no problem+json, RFC 9457 § 3.2; o 409 por nome no distrito, R1.4, também o traz)
+- (006/T3) `cnes_pendente` (R1.5) é coluna? (padrão adotado: não; a resposta o deriva de `cnes` nulo, a mesma regra da `fn_registration_status` da 011)
+- (006/T3) Qual o formato de `opening_hours` (JSONB no modelo de dados)? (padrão adotado: fora do `UnidadeCreate` até haver formato definido; a resposta traz `horario_funcionamento` nulo)
+- (006/T3) Tipo de unidade ou distrito desativado aceita unidade nova? (padrão adotado: não; 422 apontando o campo, como se não existisse)
+- (006/T3) O que é "todos os campos" em `unidade.criada` (R1.6)? (padrão adotado: os campos de negócio, com os nomes das colunas, `de` nulo, inclusive os vazios; ficam de fora `name_normalized`, `version`, `pending_issues` e as datas, mantidos pelo banco. `manager_name` vai sem máscara; mascarar na exibição é da 008/R2.3)
+- (006/T3) O 403 de quem tem `unidade:create` só em outra área é auditado? (padrão adotado: sim, `acesso.negado` sem entidade, porque a unidade não chegou a existir, 003/R4.6)
+- (006/T3) A 201 leva cabeçalhos? (padrão adotado: `Location` com a rota da unidade e `ETag` com a versão entre aspas, `"1"`, a mesma do `If-Match` da T5)
+- **Status de equipamento e de serviço (achado na T1):** o modelo de dados não lista os valores, então a 0006 deixa `equipments.status` e `services.status` sem CHECK (só o da unidade tem: `ativa`, `inativa`, `em_implantacao`). Os valores aceitos ficam para os schemas da T7 e da T8; se forem fixados, uma revisão nova põe o CHECK.

@@ -29,6 +29,7 @@ def problem_response(
     request_id: str | None,
     headers: Mapping[str, str] | None = None,
     errors: Sequence[FieldError] | None = None,
+    extensions: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
         "type": type_,
@@ -37,6 +38,8 @@ def problem_response(
         "detail": detail,
         "request_id": request_id,
     }
+    # Membros de extensão (RFC 9457, § 3.2) não substituem os padrão.
+    body |= {nome: valor for nome, valor in (extensions or {}).items() if nome not in body}
     if errors is not None:
         body["errors"] = [{"campo": e.campo, "mensagem": e.mensagem} for e in errors]
     return JSONResponse(body, status_code=status, media_type=PROBLEM_JSON, headers=headers)
@@ -74,6 +77,7 @@ async def _handle_app_error(request: Request, exc: Exception) -> JSONResponse:
         detail=error.detail,
         request_id=_request_id(request),
         errors=errors,
+        extensions=error.extensoes,
     )
 
 

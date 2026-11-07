@@ -1,0 +1,14 @@
+-- Objetivo: achar rápido os serviços de uma unidade.
+-- Justificativa: o detalhe da unidade lista os serviços dela, e as consultas de qualidade do
+--   cadastro juntam unidades com serviços pela unidade (011/R1.2). O PostgreSQL não cria índice
+--   para chave estrangeira sozinho: sem este, cada busca pelos serviços de uma unidade leria a
+--   tabela inteira, e cada exclusão de unidade (ON DELETE RESTRICT, 011/R9.3) também, para
+--   conferir se sobrou serviço vinculado.
+--   - Só `unit_id`: é a coluna da igualdade em todas as consultas que usam o índice. Serviço
+--     solto (sem unidade, 006/R6.2) tem `unit_id` nulo e fica no índice sem atrapalhar.
+--   O plano de execução que comprova o uso, com volume de demonstração, entra neste cabeçalho
+--   na 011/T9 (011/R1.3, R1.4).
+-- Uso: serviços de uma unidade (006), `vw_unit_inventory` (011/T4), `units_without_services.sql`
+--   e `units_with_services_outside_cnes.sql` (011/T11, T12).
+-- Requisitos: 011/R1.2, 011/R9.3
+CREATE INDEX ix_services_unit_id ON services (unit_id);

@@ -1,0 +1,18 @@
+-- Objetivo: achar rápido os registros da trilha de auditoria de uma entidade, do mais recente
+--   para o mais antigo.
+-- Justificativa: o histórico de uma unidade (008/R1, servido por `vw_unit_history`) filtra a
+--   trilha por tipo de entidade e identificador e ordena pela data, mais recente primeiro
+--   (011/R1.1). A trilha só cresce (é append-only e guarda 2 anos), então sem índice cada
+--   consulta leria a tabela inteira.
+--   - Colunas na ordem do filtro: igualdade em `entity_type` e `entity_id` primeiro, depois
+--     `occurred_at`; o índice entrega as linhas já na ordem da resposta, sem passo de ordenação.
+--   - `occurred_at DESC`: a ordem da tela (mais recente primeiro). Um btree também é lido de trás
+--     para a frente, mas declarar a ordem deixa a intenção no DDL e casa com o `ORDER BY`.
+--   - Os eventos de equipamento e serviço de uma unidade são gravados com `entity_type =
+--     'unidade'` e o id dela (006/R5.3), então o mesmo índice atende ao histórico completo.
+--   O plano de execução que comprova o uso, com volume de demonstração, entra neste cabeçalho
+--   na 011/T9 (011/R1.3, R1.4).
+-- Uso: `vw_unit_history` (011/T4) e a consulta `unit_history.sql` da rota
+--   `GET /unidades/{id}/historico` (011/T14, 008/R1).
+-- Requisitos: 011/R1.1
+CREATE INDEX ix_audit_log_entity ON audit_log (entity_type, entity_id, occurred_at DESC);

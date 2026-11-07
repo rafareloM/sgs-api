@@ -1,0 +1,11 @@
+-- Objetivo: achar rápido os registros do log do banco de um período, do mais recente para o
+--   mais antigo.
+-- Justificativa: a listagem do log (011/R7.7) filtra por período e mostra o mais recente
+--   primeiro. O particionamento por mês já descarta os meses fora do período; dentro do mês, o
+--   índice evita ler a partição inteira e entrega as linhas na ordem da resposta.
+--   - Criado na tabela-mãe: o PostgreSQL cria o mesmo índice em cada partição, inclusive nas
+--     que o procedimento da 011/T8 criar depois.
+--   - `occurred_at DESC`: a ordem da tela, declarada no DDL como em `ix_audit_log_entity`.
+-- Uso: consulta `db_change_log_list.sql` da rota `GET /auditoria/banco` (011/T15).
+-- Requisitos: 011/R7.7
+CREATE INDEX ix_db_change_log_occurred_at ON db_change_log (occurred_at DESC);

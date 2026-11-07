@@ -51,7 +51,7 @@ Inglês, como as tabelas (`steering/structure.md`), com prefixo: `ix_` índice, 
 ### Na 0006 (emenda da spec 006)
 Objetos que a 006 precisa para existir e que esta spec rastreia:
 - `CREATE EXTENSION unaccent` e `pg_trgm` (já no design da 006).
-- `fn_normalize_name(text) RETURNS text LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog, public`: `regexp_replace(lower(public.unaccent('public.unaccent'::regdictionary, btrim(p_name))), '\s+', ' ', 'g')`. Usada pela coluna gerada `health_units.name_normalized` (índice único com `district_id`, R5.2) e pelo índice GIN de busca. `REVOKE EXECUTE ... FROM PUBLIC; GRANT EXECUTE ... TO sgs_app` (R10.1).
+- `fn_normalize_name(text) RETURNS text LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog, public`: `btrim(regexp_replace(lower(public.unaccent('public.unaccent'::regdictionary, p_name)), '\s+', ' ', 'g'))` (o `btrim` vai por fora para que tab ou quebra de linha nas pontas também saiam, R5.1; decidido pelo Rafael em 07/11/2026). Usada pela coluna gerada `health_units.name_normalized` (índice único com `district_id`, R5.2) e pelo índice GIN de busca. `REVOKE EXECUTE ... FROM PUBLIC; GRANT EXECUTE ... TO sgs_app` (R10.1).
 - Colunas `health_units.version int NOT NULL DEFAULT 1` e `pending_issues int NOT NULL DEFAULT 0 CHECK (pending_issues >= 0)`.
 - FKs (R9): `services.equipment_id → equipments(id) ON DELETE SET NULL`; `equipments.equipment_type_code → equipment_types(code) ON UPDATE CASCADE` (`equipment_types.code` único); `equipments.unit_id` e `services.unit_id → health_units(id) ON DELETE RESTRICT` (R9.3).
 

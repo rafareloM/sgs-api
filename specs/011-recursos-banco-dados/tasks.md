@@ -10,13 +10,13 @@ As tarefas de banco (T1 a T10) só dependem das migrações 0003 e 0006 e podem 
 
 ## Base
 
-- [ ] T1. Carregador de `.sql` das migrações e modo offline do Alembic
+- [x] T1. Carregador de `.sql` das migrações e modo offline do Alembic
   - `migrations/sql_loader.py` (escapa `:`, recusa arquivo com mais de uma instrução) e ramo `context.is_offline_mode()` no `migrations/env.py`.
   - Bloqueada por: nenhuma
   - Requisitos: R11.1, R11.2
   - Pronto quando: `tests/unit/migrations/test_sql_loader.py` passa (`'HH24:MI'` e `:=` intactos; duas instruções → erro; `alembic upgrade head --sql` roda sem banco)
 
-- [ ] T2. Normalização, colunas e FKs na 0006 (com 006/T1)
+- [x] T2. Normalização, colunas e FKs na 0006 (com 006/T1)
   - `fn_normalize_name` (IMMUTABLE, `search_path` fixo, EXECUTE só para `sgs_app`) criada antes de `health_units`; coluna gerada `name_normalized` e índice GIN usando a função; `version` e `pending_issues`; FKs `ON DELETE SET NULL`, `ON UPDATE CASCADE` e `RESTRICT`.
   - Bloqueada por: T1, 003/T1
   - Requisitos: R5.1, R5.2, R9.1, R9.3
@@ -24,37 +24,37 @@ As tarefas de banco (T1 a T10) só dependem das migrações 0003 e 0006 e podem 
 
 ## Migração 0011: banco
 
-- [ ] T3. Papel dono, privilégios, índices e situação cadastral
+- [x] T3. Papel dono, privilégios, índices e situação cadastral
   - `sgs_owner NOLOGIN NOSUPERUSER` com `USAGE, CREATE` no schema e o SELECT que as funções precisam; default privileges sem EXECUTE para PUBLIC (`FOR ROLE sgs` e `sgs_owner`); `ix_audit_log_entity`, `ix_services_unit_id`; `fn_registration_status` com GRANT ao `sgs_app`.
   - Bloqueada por: T2
   - Requisitos: R1.1, R1.2, R5.3, R10.1, R10.2
   - Pronto quando: `tests/integration/db/test_privilegios.py` (papel sem login nem superusuário; PUBLIC sem EXECUTE; índices existem) e `tests/integration/registry/test_situacao_cadastral.py` (as quatro situações, na precedência aprovada) passam
 
-- [ ] T4. Views de inventário e de histórico
+- [x] T4. Views de inventário e de histórico
   - `vw_unit_inventory` e `vw_unit_history` com `security_invoker = true`, colunas do design, sem dado pessoal no inventário.
   - Bloqueada por: T3
   - Requisitos: R4.1, R4.2, R4.4, R4.6
   - Pronto quando: `tests/integration/db/test_views.py` passa (contagens do inventário; nenhuma coluna pessoal; eventos de equipamento e serviço no histórico com autor; um papel sem SELECT nas tabelas-base não lê a view)
 
-- [ ] T5. Trigger de versão da unidade
+- [x] T5. Trigger de versão da unidade
   - `trg_health_units_version` (BEFORE UPDATE), ignorando `pending_issues`, `version` e `updated_at`.
   - Bloqueada por: T2
   - Requisitos: R8.1, R8.2
   - Pronto quando: `tests/integration/registry/test_versao_trigger.py` passa (UPDATE direto incrementa versão e `updated_at`; mudança só em `pending_issues` não incrementa)
 
-- [ ] T6. Procedimento de desativação
+- [x] T6. Procedimento de desativação
   - `sp_deactivate_unit` com OUT, SQLSTATE `SGS01`, sem COMMIT; GRANT EXECUTE ao `sgs_app`.
   - Bloqueada por: T5
   - Requisitos: R6.1
   - Pronto quando: `tests/integration/registry/test_sp_deactivate_unit.py` passa (pelo login da API: `CALL` devolve status anterior e versão nova; inexistente → SQLSTATE `SGS01`; já inativa → nada muda e a versão é a mesma)
 
-- [ ] T7. Log do banco e trigger de log
+- [x] T7. Log do banco e trigger de log
   - `db_change_log` particionada (criada com `SET LOCAL ROLE sgs_owner`) com a partição DEFAULT; `trg_registry_change_log` (SECURITY DEFINER) nas três tabelas; `sgs_app` só com SELECT.
   - Bloqueada por: T3
   - Requisitos: R7.1, R7.2, R7.3, R7.4, R7.5, R7.6
   - Pronto quando: `tests/integration/audit/test_log_banco.py` (INSERT/UPDATE/DELETE com de/para; superusuário → `via_api = false`; login da API → `true`; `manager_name` mascarado; só `pending_issues` → nenhuma linha; SET NULL e CASCADE geram linhas das filhas) e `tests/integration/audit/test_log_banco_privilegios.py` (login da API sem INSERT, UPDATE, DELETE e TRUNCATE) passam
 
-- [ ] T8. Procedimento com cursor das partições e comando administrativo
+- [x] T8. Procedimento com cursor das partições e comando administrativo
   - `sp_ensure_monthly_partitions` (cursor explícito, `LOCK` da DEFAULT, `format('%I'/'%L')`, sem DROP), `CALL` na migração com 12 meses e `sgs-admin banco particoes [--meses N]` (cria o ponto de entrada `sgs-admin` com `argparse` se a 002 ainda não o tiver criado).
   - Bloqueada por: T7
   - Requisitos: R6.5, R6.6, R6.7, R6.8, R10.1
@@ -66,7 +66,7 @@ As tarefas de banco (T1 a T10) só dependem das migrações 0003 e 0006 e podem 
   - Requisitos: R1.3, R1.4
   - Pronto quando: `tests/integration/db/test_indices.py -m slow` passa (o plano do histórico de uma unidade usa `ix_audit_log_entity`; o dos serviços de uma unidade usa `ix_services_unit_id`)
 
-- [ ] T10. TLS entre a API e o PostgreSQL no compose
+- [x] T10. TLS entre a API e o PostgreSQL no compose
   - Serviço `db-certs` (CA de dev e certificado com SAN `db` num volume, chave uid 999 e 0600), `ssl=on` e `pg_hba.conf` com `hostssl`/`hostnossl reject`/`local`, API em `verify-full` com a CA montada; README atualizado.
   - Bloqueada por: nenhuma
   - Requisitos: R10.3, R10.4, R10.5
@@ -74,7 +74,7 @@ As tarefas de banco (T1 a T10) só dependem das migrações 0003 e 0006 e podem 
 
 ## Rotas (exigem `require` e `EscopoLeitura` da 003)
 
-- [ ] T11. Consultas com anti join e full outer join
+- [x] T11. Consultas com anti join e full outer join
   - `units_without_services.sql`, `unit_equipment_reconciliation.sql` (lados filtrados antes da junção), porta `ConsultasDashboard`, conferência de filtros contra as referências, rotas e schemas.
   - Bloqueada por: T4, 003/T4
   - Requisitos: R2.1, R2.2, R2.5, R2.6, R2.7, R2.8, R2.9

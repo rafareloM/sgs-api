@@ -1,0 +1,12 @@
+-- Objetivo: deixar a aplicação (`sgs_app`) só ler `vw_unit_inventory` e `vw_unit_history`.
+-- Justificativa: privilégio mínimo (steering/security.md; mesma regra das tabelas de papéis e
+--   permissões da 0003). O default privilege da 0001 dá SELECT, INSERT, UPDATE e DELETE ao
+--   `sgs_app` em toda tabela ou view que o dono das migrações criar; as views são leitura, e o
+--   inventário e o histórico só são consultados (011/T13, T14). As duas não aceitam escrita de
+--   qualquer jeito (têm junções e agregados), mas o privilégio ficaria no catálogo como se
+--   aceitassem; sem ele, o que a aplicação pode fazer com elas fica explícito.
+--   - O SELECT continua (vem do mesmo default privilege). Com `security_invoker`, quem consulta
+--     precisa também do SELECT nas tabelas-base, que o `sgs_app` já tem (011/R4.6).
+-- Uso: privilégios de `vw_unit_inventory` e `vw_unit_history`.
+-- Requisitos: 011/R4.6
+REVOKE INSERT, UPDATE, DELETE ON vw_unit_inventory, vw_unit_history FROM sgs_app;

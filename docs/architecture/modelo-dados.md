@@ -21,7 +21,7 @@ erDiagram
 
 | Tabela | Colunas principais | Observações |
 |---|---|---|
-| `users` | `id`, `username` (único, minúsculo), `email` (único, minúsculo, opcional), `display_name`, `password_hash` (Argon2id; nulo se externo), `source` (`local`/`ldap`/`oidc`), `external_id` (DN ou `sub`; nulo se local), `is_active`, `mfa_enabled`, `mfa_secret_enc`, `mfa_last_step`, `mfa_challenge_jti`, `mfa_failed_attempts`, `failed_logins`, `locked_until`, `last_login_at`, `synced_at` | Único em (`source`, `external_id`). Nunca é apagado, só desativado. `mfa_last_step` impede reusar o código TOTP (R2.4); `mfa_challenge_jti` e `mfa_failed_attempts` contam os erros por `mfa_token` (R2.6) |
+| `users` | `id`, `username` (único, minúsculo), `email` (único, minúsculo, opcional), `display_name`, `password_hash` (Argon2id; nulo se externo), `source` (`local`/`ldap`/`oidc`), `external_id` (DN ou `sub`; nulo se local), `is_active`, `mfa_enabled`, `mfa_secret_enc`, `mfa_last_step`, `mfa_challenge_jti`, `mfa_failed_attempts`, `failed_logins`, `locked_until`, `last_login_at`, `synced_at`, `authz_version` | Único em (`source`, `external_id`). Nunca é apagado, só desativado. `mfa_last_step` impede reusar o código TOTP (R2.4); `mfa_challenge_jti` e `mfa_failed_attempts` contam os erros por `mfa_token` (R2.6); `authz_version` sobe a cada alteração das atribuições e invalida o cache de permissões (003/R4.5) |
 | `groups` | `id`, `name`, `source`, `external_id`, `description`, `is_active`, `synced_at` | Único em (`source`, `external_id`) |
 | `user_groups` | `user_id`, `group_id`, `source` | PK composta |
 | `roles` | `id`, `code` (ex.: `GESTOR_UNIDADE`), `name`, `description`, `is_system` | Seed por migração |

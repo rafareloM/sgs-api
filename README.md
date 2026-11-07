@@ -5,15 +5,20 @@ API da Plataforma de Governança de Dados de Saúde · Secretaria de Saúde do R
 Documentação, specs e steering vêm primeiro; o código segue as specs aprovadas (spec-driven development).
 
 ## Subir o ambiente (Docker)
-Pré-requisito: Docker com Compose v2. O compose sobe a API, o PostgreSQL 17 e um proxy TLS (Caddy). LDAP, Keycloak e S3 local entram nas specs 004 e 005.
+Pré-requisito: Docker 26 ou mais novo, com Compose v2 (o compose monta partes de um volume com `subpath`). O compose sobe a API, o PostgreSQL 17 com TLS e um proxy TLS (Caddy). LDAP, Keycloak e S3 local entram nas specs 004 e 005.
 
 ```bash
+mkdir -p secrets
+uv run python -m src.tools.jwt_keys --output secrets/jwt-keys.json   # uma vez: chave JWT de dev
 docker compose -f docker/compose.yml up -d --build --wait
 curl -k https://localhost/health/ready      # {"status":"ok"}
 ```
 
+- A API assina os access tokens (ES256) com a chave de `secrets/jwt-keys.json`, montada no container e lida por `JWT_PRIVATE_KEYS_FILE`; sem ela, não sobe. O arquivo é segredo e fica fora do Git. Formato e rotação: `src/tools/jwt_keys.py` e `.env.example`.
 - Em `dev`, a API aplica as migrações na subida. Ela conecta como `sgs_api`, membro do papel `sgs_app`, que só insere e lê a trilha de auditoria; as migrações usam o dono do banco, `sgs`.
+- O log do banco (`db_change_log`, spec 011) é particionado por mês, e as migrações criam as partições do mês atual até 12 meses à frente. Para estender o horizonte, rode no container o comando de administração, que conecta com `DATABASE_MIGRATION_URL`: `docker compose -f docker/compose.yml exec api sgs-admin banco particoes --meses 12`. Mês que já tem registros na partição DEFAULT é pulado, com aviso (spec 011, R6.6).
 - As senhas do compose são de desenvolvimento; a API recusa iniciar com elas em `prod`.
+- A API (e as migrações) conecta ao PostgreSQL por TLS em `verify-full`: confere o certificado e o nome `db` (spec 011, R10.3). Na subida, o serviço `db-certs` gera no volume `db-certs`, se faltarem, uma CA de desenvolvimento e o certificado do servidor; a chave da CA é descartada, e nenhuma chave ou certificado vai para o Git. O banco recusa conexão pela rede sem TLS (`docker/postgres/pg_hba.conf`). A primeira subida precisa de internet (o `db-certs` instala o `openssl`). Para gerar certificados novos, apague o volume: `docker compose -f docker/compose.yml down -v` (apaga também o banco). Para um `psql`, use o socket local: `docker compose -f docker/compose.yml exec db psql -U sgs sgs`.
 - O certificado vem da CA interna do Caddy, por isso o `-k`. Para confiar na CA em vez disso (`secrets/` fica fora do Git):
 
   ```bash

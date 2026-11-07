@@ -1,5 +1,6 @@
 """PostgreSQL com SQLAlchemy assíncrono e asyncpg; migrações com Alembic (spec 001)."""
 
+import re
 import ssl
 from pathlib import Path
 
@@ -63,6 +64,27 @@ def create_engine(url: str, settings: Settings, *, pooled: bool = True) -> Async
 
 def alembic_config() -> Config:
     return Config(str(PROJECT_ROOT / "alembic.ini"))
+
+
+# Partições mensais e DEFAULT de uma tabela particionada (spec 011, R6.5): `<tabela>_yAAAAmMM` e
+# `<tabela>_default`, como em `db_change_log_y2026m11`.
+_PARTICAO = re.compile(r"(?P<tabela>.+)_(?:default|y\d{4}m\d{2})")
+
+
+def incluir_no_autogenerate(name: str | None, type_: str, parent_names: object) -> bool:
+    """`include_name` do Alembic: deixa de fora da comparação as partições.
+
+    Só a tabela-mãe é declarada no metadata (`postgresql_partition_by`); as partições nascem no
+    banco, mês a mês, pelo procedimento da spec 011. Sem o filtro, o autogenerate
+    (`make migrate`) proporia apagá-las, e o teste de migrações sincronizadas acusaria diferença.
+    """
+    if type_ != "table" or name is None:
+        return True
+    particao = _PARTICAO.fullmatch(name)
+    if particao is None:
+        return True
+    mae = metadata.tables.get(particao["tabela"])
+    return mae is None or mae.dialect_options["postgresql"]["partition_by"] is None
 
 
 async def run_migrations(url: str, settings: Settings) -> None:

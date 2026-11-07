@@ -1,0 +1,16 @@
+-- Objetivo: fazer toda função e procedimento que o dono do banco criar daqui em diante nascer sem
+--   EXECUTE para PUBLIC.
+-- Justificativa: privilégio mínimo (011/R10.1). O PostgreSQL dá EXECUTE a PUBLIC (todo usuário
+--   do banco) em toda rotina nova; esquecer o REVOKE numa delas a abriria para qualquer login.
+--   Com o default privilege, o esquecimento fecha em vez de abrir, e cada rotina recebe só o
+--   GRANT explícito de quem precisa dela. O REVOKE explícito em cada rotina continua (design da
+--   011, item 13): os dois juntos.
+--   - FOR ROLE CURRENT_USER: o design cita `FOR ROLE sgs`, o dono do banco no compose e no CI;
+--     nos testes o dono é o superusuário do container (`test`), e um papel `sgs` não existe lá.
+--     `CURRENT_USER` é sempre o papel que roda as migrações, que é quem cria as rotinas.
+--   - ON FUNCTIONS vale também para procedimentos. Default privilege é do banco (não do
+--     servidor): vai junto quando o banco é copiado de um modelo.
+-- Uso: rotinas criadas pelas migrações (`fn_registration_status`, `sp_deactivate_unit`, funções
+--   de trigger; 011/T3 a T6).
+-- Requisitos: 011/R10.1
+ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

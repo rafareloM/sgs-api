@@ -47,3 +47,8 @@ Como usuário local, quero entrar com usuário e senha.
 
 ## Perguntas em aberto
 - Validade de 8 h para a sessão é adequada à jornada da Secretaria?
+- (T4, 07/11/2026) O design não fixa estes pontos das chaves JWT; a T4 seguiu o mais simples e pede confirmação:
+  - formato: `JWT_PRIVATE_KEYS` é uma lista JSON de objetos `{"kid", "pem"}` e a primeira chave assina (sem variável de chave ativa, como o `CRYPTO_ACTIVE_KEY`). O "arquivo montado" do design é `JWT_PRIVATE_KEYS_FILE`, com o mesmo JSON, como já previa o `.env.example`; só uma das duas pode ser definida.
+  - "chave de exemplo recusada em prod": como nenhuma chave vai para o Git, a de exemplo se reconhece pelo `kid` com os marcadores das senhas de exemplo (`troque`, `exemplo`, `example`, `changeme`). Basta?
+  - `iss` e `aud` do access token: `sgs-api` nos dois (o `mfa_token` usa `aud = sgs-mfa`, do design).
+  - `amr` vai no token como lista (RFC 8176), derivada do `amr` da sessão: `pwd+otp` vira `["pwd", "otp"]`.

@@ -3,16 +3,16 @@
 - Status: Aprovado (Rafael, 07/11/2026; aprovação só do dono pela exceção provisória de `steering/sdd-workflow.md`)
 - Depende de: 001, 003
 
-- [ ] T1. Migração `0006_registry` com referências, índices (`pg_trgm`, `unaccent`, únicos parciais) e seed das referências
+- [x] T1. Migração `0006_registry` com referências, índices (`pg_trgm`, `unaccent`, únicos parciais) e seed das referências
   - Bloqueada por: 003/T1, 011/T1
   - Inclui `fn_normalize_name`, `version`, `pending_issues` e as FKs da Etapa 02, no mesmo PR da 011/T2.
   - Requisitos: R1.3, R1.4, R7.1
   - Pronto quando: `tests/integration/registry/test_schema_registry.py` passa
-- [ ] T2. Domínio: normalização de nome, `diff`, campos estruturais
+- [x] T2. Domínio: normalização de nome, `diff`, campos estruturais
   - Bloqueada por: nenhuma
   - Requisitos: R1.4, R3.4, R3.6
   - Pronto quando: `tests/unit/registry/test_dominio_unidade.py` passa
-- [ ] T3. Criar unidade com unicidade e auditoria
+- [x] T3. Criar unidade com unicidade e auditoria
   - Bloqueada por: T1, T2, 003/T4
   - Requisitos: R1.1–R1.6
   - Pronto quando: `tests/integration/registry/test_criar_unidade.py` passa

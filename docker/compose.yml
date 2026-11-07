@@ -1,12 +1,35 @@
 # Ambiente local (spec 001, R1.1): API, PostgreSQL e proxy TLS.
+# A API conecta ao banco por TLS com verificação do certificado e do nome (spec 011, R10.3).
 # LDAP, Keycloak e S3 local entram nas specs 004 e 005.
 # Subir: docker compose -f docker/compose.yml up -d --build --wait (ver README).
 # As senhas abaixo são de desenvolvimento; a API recusa iniciar com elas em prod (001/R2.3).
 name: sgs-api
 
 services:
+  # TLS do banco (spec 011, R10.5): na subida, gera no volume db-certs, se faltarem, a CA de dev e
+  # o certificado do servidor (SAN db). Nada disso vai para o Git. Detalhes no script.
+  db-certs:
+    image: alpine:3.23
+    command: ["sh", "/gerar-certificados.sh"]
+    volumes:
+      - db-certs:/certs
+      - ./postgres/gerar-certificados.sh:/gerar-certificados.sh:ro
+
   db:
     image: postgres:17
+    # TLS obrigatório pela rede (spec 011, R10.4): o pg_hba.conf montado recusa TCP sem TLS.
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_min_protocol_version=TLSv1.2
+      - -c
+      - ssl_cert_file=/certs/server.crt
+      - -c
+      - ssl_key_file=/certs/server.key
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
     environment:
       POSTGRES_DB: sgs
       POSTGRES_USER: sgs # dono do banco, usado só pelas migrações
@@ -14,6 +37,17 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      # Só a parte do servidor (certificado e chave); a API monta só a da CA.
+      - type: volume
+        source: db-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: server
+    depends_on:
+      db-certs:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready --username=sgs --dbname=sgs"]
       interval: 5s
@@ -32,8 +66,27 @@ services:
       # A API conecta como sgs_api (membro de sgs_app); as migrações, como o dono.
       DATABASE_URL: postgresql+asyncpg://sgs_api:sgs_api@db:5432/sgs
       DATABASE_MIGRATION_URL: postgresql+asyncpg://sgs:sgs@db:5432/sgs
-      DATABASE_SSL_MODE: disable
+      # TLS com verificação do certificado e do nome `db` (spec 011, R10.3); vale também para as
+      # migrações, que usam a mesma configuração.
+      DATABASE_SSL_MODE: verify-full
+      DATABASE_SSL_ROOT_CERT: /certs/ca.crt
+      # Chave de assinatura JWT (spec 002), gerada uma vez em secrets/, fora do Git (ver README).
+      JWT_PRIVATE_KEYS_FILE: /run/secrets/jwt-keys.json
+    volumes:
+      # Só o certificado da CA. O usuário da API tem o mesmo uid do postgres (999); por isso a
+      # chave do servidor não pode ser montada aqui.
+      - type: volume
+        source: db-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: ca
+    secrets:
+      - source: jwt_keys
+        target: jwt-keys.json
     depends_on:
+      db-certs:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     healthcheck:
@@ -64,7 +117,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+secrets:
+  jwt_keys:
+    file: ../secrets/jwt-keys.json
+
 volumes:
   db-data:
+  db-certs:
   caddy-data:
   caddy-config:
