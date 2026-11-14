@@ -3,47 +3,47 @@
 - Status: Aprovado (Rafael, 07/11/2026; aprovação só do dono pela exceção provisória de `steering/sdd-workflow.md`)
 - Depende de: 001, 003
 
-- [ ] T1. Migração `0006_registry` com referências, índices (`pg_trgm`, `unaccent`, únicos parciais) e seed das referências
+- [x] T1. Migração `0006_registry` com referências, índices (`pg_trgm`, `unaccent`, únicos parciais) e seed das referências
   - Bloqueada por: 003/T1, 011/T1
   - Inclui `fn_normalize_name`, `version`, `pending_issues` e as FKs da Etapa 02, no mesmo PR da 011/T2.
   - Requisitos: R1.3, R1.4, R7.1
   - Pronto quando: `tests/integration/registry/test_schema_registry.py` passa
-- [ ] T2. Domínio: normalização de nome, `diff`, campos estruturais
+- [x] T2. Domínio: normalização de nome, `diff`, campos estruturais
   - Bloqueada por: nenhuma
   - Requisitos: R1.4, R3.4, R3.6
   - Pronto quando: `tests/unit/registry/test_dominio_unidade.py` passa
-- [ ] T3. Criar unidade com unicidade e auditoria
+- [x] T3. Criar unidade com unicidade e auditoria
   - Bloqueada por: T1, T2, 003/T4
   - Requisitos: R1.1–R1.6
   - Pronto quando: `tests/integration/registry/test_criar_unidade.py` passa
-- [ ] T4. Listar, buscar, filtrar, ordenar e detalhar com escopo
+- [x] T4. Listar, buscar, filtrar, ordenar e detalhar com escopo
   - Bloqueada por: T1, 003/T4
   - Requisitos: R2.1–R2.6
   - Pronto quando: `tests/integration/registry/test_buscar_unidades.py` passa
-- [ ] T5. Atualizar com `If-Match`, escopo, campos estruturais e auditoria por campo
+- [x] T5. Atualizar com `If-Match`, escopo, campos estruturais e auditoria por campo
   - Bloqueada por: T3, 011/T5
   - Sem incrementar `version` (trigger da 011); no mesmo PR da 011/T17.
   - Requisitos: R3.1–R3.6
   - Pronto quando: `tests/integration/registry/test_atualizar_unidade.py` passa
-- [ ] T6. Desativar unidade
+- [x] T6. Desativar unidade
   - Bloqueada por: T3, 011/T6
   - Pelo `sp_deactivate_unit` da 011; no mesmo PR da 011/T16.
   - Requisitos: R4.1, R4.2
   - Pronto quando: `tests/integration/registry/test_desativar_unidade.py` passa
-- [ ] T7. Equipamentos (vinculados e sem unidade)
+- [x] T7. Equipamentos (vinculados e sem unidade)
   - Bloqueada por: T3
   - Requisitos: R5.1–R5.3
   - Pronto quando: `tests/integration/registry/test_equipamentos.py` passa
-- [ ] T8. Serviços (vinculados e soltos) e vínculo por id
+- [x] T8. Serviços (vinculados e soltos) e vínculo por id
   - Bloqueada por: T7
   - Requisitos: R6.1–R6.4
   - Pronto quando: `tests/integration/registry/test_servicos.py` passa
-- [ ] T9. Rotas de referência
+- [x] T9. Rotas de referência
   - Bloqueada por: T1, 003/T4
   - Código editável com cascata e auditoria; no mesmo PR da 011/T18.
   - Requisitos: R7.1, R7.2, R7.3
   - Pronto quando: `tests/integration/registry/test_referencias.py` passa
-- [ ] T10. Teste de desempenho da busca
+- [x] T10. Teste de desempenho da busca
   - Bloqueada por: T4
   - Requisitos: R2.7
   - Pronto quando: `tests/e2e/test_busca_desempenho.py -m slow` passa

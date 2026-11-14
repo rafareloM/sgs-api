@@ -1,4 +1,4 @@
-.PHONY: check test-all openapi migrate up down
+.PHONY: check test-all openapi sql-bd migrate up down
 
 check:
 	uv run ruff check .
@@ -12,6 +12,11 @@ test-all:
 
 openapi:
 	uv run python -m src.tools.export_openapi > contracts/openapi.yaml
+
+# SQL da disciplina de Banco de Dados (spec 011, R11.3): DDL das migrações e consultas, sem banco.
+sql-bd: export PYTHONUTF8 = 1
+sql-bd:
+	uv run python -m src.tools.sql_bd build/sql-bd.sql
 
 migrate:
 	uv run alembic revision --autogenerate -m "$(m)"

@@ -1,0 +1,11 @@
+-- Objetivo: garantir que PUBLIC não executa `trg_registry_change_log`.
+-- Justificativa: privilégio mínimo (011/R10.1). A função roda com o privilégio do `sgs_owner`,
+--   dono do log; o default privilege da 0011_03 (05_default_privileges_sgs_owner.sql) já a faz
+--   nascer sem EXECUTE para PUBLIC, e o REVOKE explícito (design da 011, item 13) deixa a regra
+--   visível junto da função. Ninguém recebe GRANT: o PostgreSQL confere o EXECUTE de quem cria
+--   o trigger, não de quem faz a escrita que o dispara, então o login da API grava no cadastro
+--   e o log é escrito sem que ele possa chamar a função (conferido em
+--   tests/integration/audit/test_log_banco.py, pelo login da API).
+-- Uso: privilégios de `trg_registry_change_log`.
+-- Requisitos: 011/R10.1, 011/R7.6
+REVOKE EXECUTE ON FUNCTION trg_registry_change_log() FROM PUBLIC;

@@ -16,6 +16,13 @@ from src.core.errors import AppError, DomainValidationError, FieldError
 
 PROBLEM_JSON = "application/problem+json"
 
+
+def problema(descricao: str) -> dict[str, Any]:
+    """Uma resposta de erro em problem+json para o `responses=` da rota, só para o contrato
+    (OpenAPI): a descrição e o tipo de conteúdo."""
+    return {"description": descricao, "content": {PROBLEM_JSON: {}}}
+
+
 _VALIDATION_TYPE = DomainValidationError.type
 _VALIDATION_TITLE = DomainValidationError.title
 
@@ -29,6 +36,7 @@ def problem_response(
     request_id: str | None,
     headers: Mapping[str, str] | None = None,
     errors: Sequence[FieldError] | None = None,
+    extensions: Mapping[str, object] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
         "type": type_,
@@ -37,6 +45,8 @@ def problem_response(
         "detail": detail,
         "request_id": request_id,
     }
+    # Membros de extensão (RFC 9457, § 3.2) não substituem os padrão.
+    body |= {nome: valor for nome, valor in (extensions or {}).items() if nome not in body}
     if errors is not None:
         body["errors"] = [{"campo": e.campo, "mensagem": e.mensagem} for e in errors]
     return JSONResponse(body, status_code=status, media_type=PROBLEM_JSON, headers=headers)
@@ -74,6 +84,7 @@ async def _handle_app_error(request: Request, exc: Exception) -> JSONResponse:
         detail=error.detail,
         request_id=_request_id(request),
         errors=errors,
+        extensions=error.extensoes,
     )
 
 

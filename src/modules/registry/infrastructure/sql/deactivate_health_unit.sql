@@ -1,0 +1,12 @@
+-- Objetivo: desativar uma unidade de saúde pelo procedimento do banco e saber o status que ela
+--   tinha.
+-- Justificativa: a desativação é do próprio banco (011/R6.1); a API só chama o procedimento, na
+--   transação da requisição, junto com a auditoria (011/R6.2). O procedimento trava a linha,
+--   troca o status só se ela não estiver inativa (011/R6.4) e levanta o SQLSTATE `SGS01` se a
+--   unidade não existe, que o repositório traduz sem repassar a mensagem do banco (011/R6.3). A
+--   versão nova vem do trigger `trg_health_units_version`, nunca da aplicação (011/R8).
+--   Os dois NULL ocupam os parâmetros OUT; o CALL devolve uma linha com `o_previous_status` e
+--   `o_version`.
+-- Uso: SqlRepositorioDeUnidades.desativar, no caso de uso de desativar unidade (006/T6, 011/T16).
+-- Requisitos: 006/R4.1, 011/R6.1, 011/R6.2, 011/R6.3, 011/R6.4
+CALL sp_deactivate_unit(CAST(:id AS uuid), NULL, NULL)

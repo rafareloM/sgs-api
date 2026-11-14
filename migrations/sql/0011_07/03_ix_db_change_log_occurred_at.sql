@@ -1,0 +1,24 @@
+-- Objetivo: achar rápido os registros do log do banco de um período, do mais recente para o
+--   mais antigo.
+-- Justificativa: a listagem do log (011/R7.7) filtra por período e mostra o mais recente
+--   primeiro. O particionamento por mês já descarta os meses fora do período; dentro do mês, o
+--   índice evita ler a partição inteira e entrega as linhas na ordem da resposta.
+--   - Criado na tabela-mãe: o PostgreSQL cria o mesmo índice em cada partição, inclusive nas
+--     que o procedimento da 011/T8 criar depois.
+--   - `occurred_at DESC`: a ordem da tela, declarada no DDL como em `ix_audit_log_entity`.
+-- Plano que comprova o uso (011/R1.4; revisão do /implement-spec): com volume de demonstração
+--   (1.000 unidades com CNES, 3.000 serviços e a trilha correspondente, semeados pelo dono do
+--   banco) e depois de ANALYZE, `EXPLAIN (COSTS OFF)` da consulta `db_change_log_list.sql` com um período de duas horas em
+--   volta de agora (os registros que os INSERTs do cadastro gravaram no log),
+--   pelo login da API, sem forçar nada (`enable_seqscan` no padrão). Teste que repete a prova:
+--   `tests/integration/db/test_indices.py -m slow`.
+--   Plano (trecho):
+--     ->  Bitmap Heap Scan on db_change_log_y<AAAA>m<MM> l
+--           ->  Bitmap Index Scan on db_change_log_y<AAAA>m<MM>_occurred_at_idx
+--                 Index Cond: ((occurred_at >= '<de>') AND (occurred_at <= '<até>'))
+--   Só a partição do mês é lida (as outras são descartadas pelo particionamento), e dentro dela
+--   pelo índice que o PostgreSQL criou a partir deste. Sem período, a listagem lê todas as
+--   partições inteiras (não há o que filtrar).
+-- Uso: consulta `db_change_log_list.sql` da rota `GET /auditoria/banco` (011/T15).
+-- Requisitos: 011/R7.7
+CREATE INDEX ix_db_change_log_occurred_at ON db_change_log (occurred_at DESC);

@@ -1,0 +1,11 @@
+-- Objetivo: garantir que PUBLIC não executa `sp_ensure_monthly_partitions`.
+-- Justificativa: privilégio mínimo (011/R10.1). O procedimento roda com o privilégio do
+--   `sgs_owner` e cria tabelas; o default privilege da 0011_03
+--   (05_default_privileges_sgs_owner.sql) já o faz nascer sem EXECUTE para PUBLIC, e o REVOKE
+--   explícito (design da 011, item 13) deixa a regra visível junto do procedimento. Ninguém
+--   recebe GRANT: quem cria partições é a migração e o comando administrativo, que conectam
+--   com o dono do banco (DATABASE_MIGRATION_URL), nunca o login da API (conferido em
+--   tests/integration/audit/test_particoes.py).
+-- Uso: privilégios de `sp_ensure_monthly_partitions`.
+-- Requisitos: 011/R10.1
+REVOKE EXECUTE ON PROCEDURE sp_ensure_monthly_partitions(regclass, integer) FROM PUBLIC;

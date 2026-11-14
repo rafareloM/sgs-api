@@ -1,0 +1,13 @@
+-- Objetivo: criar, ao migrar, as partições do log do banco do mês atual até 12 meses à frente.
+-- Justificativa: quem sobe o sistema não precisa lembrar de um comando para o log já nascer
+--   particionado; toda migração (inclusive as próximas subidas, que rodam esta revisão uma vez
+--   só) deixa um ano de folga (011/R6.7). Depois disso, o comando `sgs-admin banco particoes`
+--   estende o horizonte (011/R6.8); se ninguém o rodar, os registros caem na DEFAULT, sem perda
+--   (design da 011 § Riscos).
+--   - Chamado por quem migra, já fora do `SET LOCAL ROLE sgs_owner`: é o mesmo caminho do
+--     comando administrativo, que conecta com o dono do banco. O procedimento é SECURITY
+--     DEFINER, então as partições nascem do `sgs_owner` do mesmo jeito.
+--   - Sai também no modo offline (`alembic upgrade head --sql`), base do `make sql-bd`.
+-- Uso: migração 0011_08.
+-- Requisitos: 011/R6.7
+CALL sp_ensure_monthly_partitions('db_change_log', 12);

@@ -1,0 +1,14 @@
+-- Objetivo: criar a partição DEFAULT do log do banco, que recebe todo registro sem partição
+--   mensal.
+-- Justificativa: numa tabela particionada sem partição para a data, o INSERT falha; aqui, isso
+--   faria falhar a alteração do cadastro que disparou o trigger. Com a DEFAULT, nenhuma
+--   alteração deixa de ser gravada nem de ser registrada (011/R7.1), mesmo antes de as
+--   partições mensais existirem ou se a manutenção atrasar (design da 011 § Riscos).
+--   - O procedimento das partições (011/T8) não cria o mês que já tem linha na DEFAULT: avisa
+--     e pula, sem mover registros (011/R6.6).
+--   - Nasce com o `sgs_owner` como dono, como a tabela-mãe (`SET LOCAL ROLE`, na revisão), e
+--     sem privilégio para o `sgs_app`: a leitura passa pela tabela-mãe (011/R7.6).
+-- Uso: `db_change_log`; listada em `GET /auditoria/banco/particoes` (011/T15) com intervalo
+--   nulo.
+-- Requisitos: 011/R7.1, 011/R6.6
+CREATE TABLE db_change_log_default PARTITION OF db_change_log DEFAULT;

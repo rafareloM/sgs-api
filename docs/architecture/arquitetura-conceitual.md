@@ -244,9 +244,13 @@ sequenceDiagram
 | `GET/POST /api/v1/admin/usuarios` | `usuario:manage` | 003 |
 | `POST /api/v1/admin/diretorio/sincronizar` · `GET .../execucoes` | `diretorio:sync` | 004 |
 | `GET/POST/PATCH /api/v1/unidades` (+ equipamentos, serviços, referências) | `unidade:*`, `equipamento:write`, `servico:write` | 006 |
+| `POST /api/v1/unidades/{id}/desativar` | `unidade:deactivate` | 006, 011 |
 | `GET/POST/PATCH /api/v1/validacao/regras` · `/simular` · `/revalidar` | `regra_validacao:manage` | 007 |
-| `GET /api/v1/unidades/{id}/historico` · `/auditoria/eventos` · `/auditoria/verificar` | `auditoria:read` | 008 |
+| `GET /api/v1/unidades/{id}/historico` · `/auditoria/eventos` · `/auditoria/verificar` | `auditoria:read` (o histórico, no escopo da unidade) | 008 (o histórico, adiantado pela 011/R4.5) |
+| `GET /api/v1/auditoria/banco` · `/auditoria/banco/particoes` | `auditoria:read` em escopo global | 011 |
 | `GET /api/v1/dashboard/resumo` | `dashboard:read` | 009 |
+| `GET /api/v1/dashboard/consultas` (catálogo, filtrado pelas permissões do usuário) | `dashboard:read` | 011 |
+| `GET /api/v1/dashboard/consultas/unidades-sem-servico` · `/conciliacao-unidade-equipamento` · `/distritos-cnes-acima-da-media` · `/unidades-servico-fora-cnes` · `/inventario` | `dashboard:read` (no escopo de leitura) | 011 |
 | `POST /api/v1/relatorios` · `GET /{id}` · `GET /{id}/download` | `relatorio:*` | 005 |
 | `GET /health/live` · `/health/ready` | pública | 001 |
 

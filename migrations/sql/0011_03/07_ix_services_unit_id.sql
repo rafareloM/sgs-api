@@ -1,0 +1,24 @@
+-- Objetivo: achar rápido os serviços de uma unidade.
+-- Justificativa: o detalhe da unidade lista os serviços dela, e as consultas de qualidade do
+--   cadastro juntam unidades com serviços pela unidade (011/R1.2). O PostgreSQL não cria índice
+--   para chave estrangeira sozinho: sem este, cada busca pelos serviços de uma unidade leria a
+--   tabela inteira, e cada exclusão de unidade (ON DELETE RESTRICT, 011/R9.3) também, para
+--   conferir se sobrou serviço vinculado.
+--   - Só `unit_id`: é a coluna da igualdade em todas as consultas que usam o índice. Serviço
+--     solto (sem unidade, 006/R6.2) tem `unit_id` nulo e fica no índice sem atrapalhar.
+-- Plano que comprova o uso (011/R1.3, R1.4), registrado na 011/T9: com volume de demonstração
+--   (1.000 unidades, 3.000 serviços) e depois de ANALYZE, `EXPLAIN (COSTS OFF)` de
+--   `SELECT id, name, in_cnes, status FROM services WHERE unit_id = (id) ORDER BY name`, pelo
+--   login da API, sem forçar nada (`enable_seqscan` no padrão):
+--     Sort
+--       Sort Key name
+--       ->  Bitmap Heap Scan on services
+--             Recheck Cond (unit_id = '<uuid da unidade>'::uuid)
+--             ->  Bitmap Index Scan on ix_services_unit_id
+--                   Index Cond (unit_id = '<uuid da unidade>'::uuid)
+--   Os três serviços da unidade saem pelo índice, sem ler a tabela inteira. Teste que repete a
+--   prova: `tests/integration/db/test_indices.py -m slow`.
+-- Uso: serviços de uma unidade (006), `vw_unit_inventory` (011/T4), `units_without_services.sql`
+--   e `units_with_services_outside_cnes.sql` (011/T11, T12).
+-- Requisitos: 011/R1.2, 011/R9.3
+CREATE INDEX ix_services_unit_id ON services (unit_id);

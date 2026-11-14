@@ -1,0 +1,11 @@
+-- Objetivo: fazer toda função e procedimento que o `sgs_owner` criar nascer sem EXECUTE para
+--   PUBLIC.
+-- Justificativa: as rotinas do `sgs_owner` rodam com o privilégio dele (SECURITY DEFINER) e
+--   gravam no log do banco; abertas a PUBLIC, qualquer login escreveria no log ou criaria
+--   partições (011/R10.1, R7.6). O mesmo default privilege do arquivo anterior, agora para as
+--   rotinas que nascem com o `sgs_owner` como dono (criadas com `SET LOCAL ROLE sgs_owner`).
+--   Quem roda a migração precisa ser membro do `sgs_owner` ou superusuário (o dono do banco no
+--   compose e nos testes é superusuário).
+-- Uso: `trg_registry_change_log` e `sp_ensure_monthly_partitions` (011/T7, T8).
+-- Requisitos: 011/R10.1
+ALTER DEFAULT PRIVILEGES FOR ROLE sgs_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

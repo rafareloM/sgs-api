@@ -1,0 +1,11 @@
+-- Objetivo: tirar de PUBLIC o EXECUTE da função de trigger `audit_log_somente_insercao()`.
+-- Justificativa: privilégio mínimo (011/R10.1, "NÃO DEVEM ser executáveis por qualquer usuário
+--   do banco"). A função é da 0001, anterior aos default privileges da 0011_03, e nasceu com o
+--   EXECUTE que o PostgreSQL dá a PUBLIC em toda função nova. Ninguém precisa dele: o PostgreSQL
+--   não confere EXECUTE da função de trigger para quem dispara o trigger, então o UPDATE, o
+--   DELETE e o TRUNCATE em `audit_log` continuam barrados (001/R5.2). Achado da 011/T3,
+--   resolvido na revisão do /implement-spec.
+-- Uso: privilégios de `audit_log_somente_insercao()`; conferido em
+--   tests/integration/db/test_privilegios.py.
+-- Requisitos: 011/R10.1, 001/R5.2
+REVOKE EXECUTE ON FUNCTION audit_log_somente_insercao() FROM PUBLIC;

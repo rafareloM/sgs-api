@@ -14,7 +14,12 @@ dependencies = [
   "structlog>=26.1.0,<27",
   "uvicorn>=0.54.0,<0.55",
   "cryptography>=50.0.2,<51",
+  "pyjwt[crypto]>=2.15.0,<2.16",
 ]
+
+# Comandos de administração (spec 002 § Decisões: argparse). Subcomandos em src/tools/sgs_admin.py.
+[project.scripts]
+sgs-admin = "src.tools.sgs_admin:main"
 
 [dependency-groups]
 dev = [
