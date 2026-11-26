@@ -128,6 +128,8 @@ def test_subnets_das_suites_sao_unicas_e_fora_dos_pools_do_docker() -> None:
         "KEYCLOAK": RAIZ / "tests" / "e2e" / "test_lab_keycloak.py",
         "LDAP": RAIZ / "tests" / "e2e" / "test_lab_ldap.py",
         "S3": RAIZ / "tests" / "e2e" / "test_export_s3.py",
+        "SYNC_LDAP": RAIZ / "tests" / "e2e" / "test_sync_ldap.py",
+        "LOGIN": RAIZ / "tests" / "e2e" / "test_login_ldap_oidc.py",
     }
     assert set(suites) == set(SUBNETS)
     for suite, arquivo in suites.items():

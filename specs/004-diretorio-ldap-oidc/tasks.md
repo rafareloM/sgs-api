@@ -230,7 +230,8 @@ O mesmo quadro está em `specs/005-exportacao-relatorios-s3/tasks.md`. Cada fren
   - Bloqueada por: T1, T6, 003/T8
   - Requisitos: R3.1, R3.2, R3.3, R3.4, R3.5, R3.7, R3.8, R4.3, R4.4
   - Pronto quando: `tests/integration/identity/test_oidc_callback.py` e `tests/architecture/test_rotas_protegidas.py` passam
-- [ ] T14. Demonstração ponta a ponta e roteiro
+- [x] T14. Demonstração ponta a ponta e roteiro
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/e2e/test_sync_ldap.py -m slow` e `tests/e2e/test_login_ldap_oidc.py -m slow` (`tests/e2e` inteiro: 35 passed)
   - Frente: B
   - Faz:
     - testes `slow` contra o compose: sincronização que cria, altera e desativa; recusa pela CA do banco e por `ldap-nome-errado` com `sgs-admin diretorio testar`; login LDAP com cadastro do TOTP (`pyotp`); login OIDC pelo navegador até `/me`;

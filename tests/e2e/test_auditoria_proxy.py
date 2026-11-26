@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from src.tools import crypto_keys, jwt_keys
+from tests.e2e import segredos
 from tests.e2e.redes import Borda, SubnetOcupadaError, borda_da_suite
 
 pytestmark = pytest.mark.slow
@@ -134,6 +135,7 @@ def contexto_tls(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ssl.SSLCo
     if criou_cifra:
         CHAVES_DE_CIFRA.parent.mkdir(exist_ok=True)
         crypto_keys.main(["--output", str(CHAVES_DE_CIFRA)])
+    segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     try:
         subida = _compose("up", "-d", "--build", "--wait", "proxy", check=False, timeout=900)
         if subida.returncode != 0:
@@ -149,6 +151,7 @@ def contexto_tls(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ssl.SSLCo
             CHAVES_JWT.unlink(missing_ok=True)
         if criou_cifra:
             CHAVES_DE_CIFRA.unlink(missing_ok=True)
+        segredos.apagar(segredos_da_005)
         if criou_pasta:
             CHAVES_JWT.parent.rmdir()
 

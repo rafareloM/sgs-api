@@ -2,10 +2,7 @@
 
 Roteiro da spec 004 (R5.3, R1.13, R3.9; design § Roteiro e ferramenta). Mostra, no ambiente local, a sincronização criando, alterando e desativando usuários e grupos, o mapeamento de um grupo para um papel, o login LDAP com 2FA, o login OIDC pela tela e a recusa de certificado LDAP. Leva uns 15 minutos.
 
-- **Estado em 25/11/2026: rascunho (004/T14).**
-  - Prontos: o laboratório (Keycloak e `slapd`, 004/T8 e T13), a validação do `id_token` (T6) e o botão do front (T10).
-  - Faltam: o mapeamento grupo → papel (003/T8), as rotas da sincronização (004/T4), o login LDAP (T5), as rotas OIDC (T7) e o `sgs-admin diretorio testar` (T11).
-  - Os passos que dependem deles seguem o design. Corpos e números marcados com **(conferir na T14)** são conferidos quando essas tarefas entrarem.
+- **Estado em 26/11/2026: conferido na 004/T14**, pelos testes abaixo, contra o compose. Os números dos passos 1 e 2 e o corpo do passo 3 são os que eles conferem.
 - **Testes que automatizam o roteiro:** `tests/e2e/test_sync_ldap.py` e `tests/e2e/test_login_ldap_oidc.py`, com `-m slow`.
 - **Senhas:** as do laboratório (`sgs-lab-exemplo-*`) são fixas, versionadas e só locais (D004-15); a API as recusa em `prod` (R5.4). A senha do administrador local é sua: digite-a quando o comando pedir e não a grave em arquivo.
 
@@ -55,7 +52,7 @@ sleep 3
 json "$API/admin/diretorio/execucoes/$EXEC" -H "Authorization: Bearer $ADMIN" | jq '{status, usuarios, grupos, conflitos}'
 ```
 
-- **Esperado:** `status: "concluida"`, `usuarios.criados: 8` (um por papel, mais `ldap.temporario`) e `grupos.criados: 7`, sem conflitos **(conferir na T14)**.
+- **Esperado:** `status: "concluida"`, `usuarios.criados: 8` (um por papel, mais `ldap.temporario`) e `grupos.criados: 7`, sem conflitos.
 - **Uma sincronização por vez:** um segundo `POST` enquanto a primeira roda responde 409.
 - **Grupos espelhados:** a lista está em `GET $API/admin/diretorio/grupos?origem=ldap`.
 
@@ -80,18 +77,18 @@ sleep 3
 json "$API/admin/diretorio/execucoes/$EXEC" -H "Authorization: Bearer $ADMIN" | jq '{status, usuarios, grupos}'
 ```
 
-- **Esperado:** `usuarios.atualizados: 1` (o nome) e `usuarios.desativados: 1` (`ldap.temporario`) **(conferir na T14)**.
+- **Esperado:** `usuarios.criados: 0` e `usuarios.desativados: 1` (`ldap.temporario`). O `usuarios.atualizados` conta todas as pessoas que continuam no diretório, mudadas ou não (design, passo 3.3; nota N8 da revisão da frente A), e não só a do nome.
 - **A conta não é apagada, só desativada (R1.7):** o histórico e a auditoria dela continuam.
-- **Sem o *overlay* `refint`** (nota da 004/T13), o DN apagado continua no `member` de `sgs-tecnico-ds3`. A sincronização ignora membro que não é pessoa encontrada, então a contagem de grupos pode não mudar **(conferir na T14)**.
+- **Sem o *overlay* `refint`** (nota da 004/T13), o DN apagado continua no `member` de `sgs-tecnico-ds3`. A sincronização ignora membro que não é pessoa encontrada, e os 7 grupos continuam (`GET $API/admin/diretorio/grupos?origem=ldap` com `total: 7`).
 
 ## 3. Mapear um grupo para um papel (spec 003, R3.1)
 O grupo `sgs-tecnico-ds3` vira o papel `TECNICO_DISTRITAL` com escopo no Distrito Sanitário III. Os membros ativos ganham a atribuição de origem `group` na hora.
 
 ```bash
 GRUPO=$(json "$API/admin/diretorio/grupos?origem=ldap&busca=sgs-tecnico-ds3" -H "Authorization: Bearer $ADMIN" | jq -r '.itens[0].id')
-# corpo da 003/T8 (conferir na T14): grupo, papel e escopo
+ID_DS3=$(docker compose -f docker/compose.yml exec -T db psql -U sgs sgs -Atc "SELECT id FROM districts WHERE code = 'DS-III'")
 json -X POST "$API/admin/mapeamentos-grupo" -H "Authorization: Bearer $ADMIN" \
-  -d "{\"grupo_id\": \"$GRUPO\", \"papel\": \"TECNICO_DISTRITAL\", \"escopo\": {\"tipo\": \"distrito\", \"id\": \"<id do DS-III>\"}}"
+  -d "{\"grupo_id\": \"$GRUPO\", \"papel\": \"TECNICO_DISTRITAL\", \"escopo_tipo\": \"distrito\", \"escopo_id\": \"$ID_DS3\"}"
 ```
 
 Para os outros papéis, repita com o grupo de cada um. Os nomes estão no README § Diretório LDAP de laboratório.
@@ -117,7 +114,7 @@ json "$API/me" -H "Authorization: Bearer $DS3" | jq
 2. Clique. O navegador vai ao Keycloak (`https://keycloak.localhost`), realm `sgs`.
 3. Entre com `oidc.tecnico.ds4`, senha `sgs-lab-exemplo-usuario`.
 4. O Keycloak volta ao callback da API, que confere `state`, `nonce` e o `id_token` e redireciona ao front. Nenhum token passa pela URL (R3.4): o front abre a sessão pela renovação, com o cookie de refresh.
-5. **Esperado:** a tela inicial, sem papel. O grupo `oidc-tecnico-ds-iv` é espelhado no primeiro login e ainda não tem mapeamento. Mapeie-o como no passo 3 (`origem=oidc`, Distrito IV) e entre de novo: o papel aparece.
+5. **Esperado:** a tela "sem acesso" (`#/sem-acesso`), porque a conta ainda não tem papel. O grupo `oidc-tecnico-ds-iv` é espelhado no primeiro login e ainda não tem mapeamento. Mapeie-o como no passo 3 (`origem=oidc`, Distrito IV) e entre de novo: o papel aparece.
 
 - **Recusa:** qualquer falha no retorno, como `state` vencido, `id_token` inválido ou conta inativa, volta ao login com "Não foi possível entrar pelo provedor de identidade. Tente de novo.". A auditoria grava `auth.oidc_failed` com o motivo.
 - **Usuários do Keycloak** são outros, sem federação com o `slapd` (D004-7). Os nomes estão no README § Provedor OIDC de laboratório.

@@ -25,7 +25,7 @@ import shutil
 import ssl
 import subprocess
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
@@ -39,7 +39,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import Prehashed, encode_ds
 from playwright.sync_api import Error as ErroDoPlaywright
 from playwright.sync_api import sync_playwright
 
-from src.tools import crypto_keys, jwt_keys, s3_sse_key
+from tests.e2e import segredos
 from tests.e2e.redes import Borda, SubnetOcupadaError, borda_da_suite
 
 pytestmark = pytest.mark.slow
@@ -61,31 +61,8 @@ AMBIENTE_COMPOSE = {
     "SGS_PUBLIC_KEYCLOAK_URL": f"https://keycloak.localhost:{PORTA_HTTPS}",
     "SGS_PUBLIC_S3_URL": S3_PUBLICO,
 }
-SEGREDOS = RAIZ / "secrets"
 
 
-def _jwt(caminho: Path) -> None:
-    jwt_keys.main(["--output", str(caminho)])
-
-
-def _cifra(caminho: Path) -> None:
-    crypto_keys.main(["--output", str(caminho)])
-
-
-def _relatorios(caminho: Path) -> None:
-    jwt_keys.main(["--kid", "rel-e2e", "--output", str(caminho)])
-
-
-def _sse_do_s3(caminho: Path) -> None:
-    s3_sse_key.main(["--output", str(caminho)])
-
-
-ARQUIVOS_DE_SEGREDO: dict[str, Callable[[Path], None]] = {
-    "jwt-keys.json": _jwt,
-    "crypto-keys.json": _cifra,
-    "report-keys.json": _relatorios,
-    "s3-security.toml": _sse_do_s3,
-}
 DOCKER = shutil.which("docker")
 CA_DO_CADDY = "/data/caddy/pki/authorities/local/root.crt"
 USUARIO = "gestor.e2e.s3"
@@ -144,18 +121,6 @@ def _na_api(script: str, *args: str) -> str:
     return _compose("exec", "-T", "api", "python", "-c", script, *args).stdout
 
 
-def _criar_segredos() -> list[Path]:
-    """Os segredos que o compose monta, só os que faltam; devolve os criados, para apagar."""
-    criados = []
-    SEGREDOS.mkdir(exist_ok=True)
-    for nome, gerar in ARQUIVOS_DE_SEGREDO.items():
-        caminho = SEGREDOS / nome
-        if not caminho.exists():
-            gerar(caminho)
-            criados.append(caminho)
-    return criados
-
-
 @pytest.fixture(scope="module")
 def ambiente(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Any]]:
     if DOCKER is None:
@@ -164,8 +129,7 @@ def ambiente(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Any
         _BORDA[:] = [borda_da_suite("S3", DOCKER, projeto=PROJETO)]
     except SubnetOcupadaError as erro:
         pytest.skip(str(erro))
-    criou_pasta = not SEGREDOS.exists()
-    criados = _criar_segredos()
+    criados = segredos.criar_faltando()
     senha = secrets.token_urlsafe(16)
     try:
         subida = _compose(
@@ -196,10 +160,7 @@ def ambiente(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Any
     finally:
         # Só o projeto descartável deste arquivo, pelo nome, com os volumes dele.
         _compose("down", "-v", "--remove-orphans", check=False, timeout=300)
-        for caminho in criados:
-            caminho.unlink(missing_ok=True)
-        if criou_pasta:
-            SEGREDOS.rmdir()
+        segredos.apagar(criados)
 
 
 def _esperar_o_s3_init() -> None:

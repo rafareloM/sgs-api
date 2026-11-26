@@ -23,6 +23,7 @@ from playwright.sync_api import Browser, BrowserContext, Page, expect, sync_play
 from playwright.sync_api import Error as ErroDoPlaywright
 
 from src.tools import crypto_keys, jwt_keys
+from tests.e2e import segredos
 from tests.e2e.redes import Borda, SubnetOcupadaError, borda_da_suite
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -108,6 +109,7 @@ def senha_demo() -> Iterator[str]:
     if criou_cifra:
         CHAVES_DE_CIFRA.parent.mkdir(exist_ok=True)
         crypto_keys.main(["--output", str(CHAVES_DE_CIFRA)])
+    segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     senha = secrets.token_urlsafe(16)
     try:
         subida = _compose("up", "-d", "--build", "--wait", "proxy", check=False, timeout=900)
@@ -135,6 +137,7 @@ def senha_demo() -> Iterator[str]:
             CHAVES_JWT.unlink(missing_ok=True)
         if criou_cifra:
             CHAVES_DE_CIFRA.unlink(missing_ok=True)
+        segredos.apagar(segredos_da_005)
         if criou_pasta:
             CHAVES_JWT.parent.rmdir()
 

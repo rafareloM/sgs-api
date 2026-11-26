@@ -25,6 +25,8 @@ SUBNETS = {
     "KEYCLOAK": "10.231.14.0/28",  # tests/e2e/test_lab_keycloak.py
     "LDAP": "10.231.15.0/28",  # tests/e2e/test_lab_ldap.py
     "S3": "10.231.16.0/28",  # tests/e2e/test_export_s3.py
+    "SYNC_LDAP": "10.231.17.0/28",  # tests/e2e/test_sync_ldap.py
+    "LOGIN": "10.231.18.0/28",  # tests/e2e/test_login_ldap_oidc.py
 }
 """Suíte → subnet padrão. Os stacks de desenvolvimento usam 10.231.1.0/28 (.env.example)."""
 
