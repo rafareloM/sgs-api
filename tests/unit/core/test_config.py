@@ -801,6 +801,9 @@ CHAVES_FIXAS = (
     "AWS_SESSION_TOKEN",
     "AWS_PROFILE",
     "AWS_DEFAULT_PROFILE",  # nome antigo do AWS_PROFILE, que o botocore ainda lê
+    "AWS_SECURITY_TOKEN",  # nome antigo do AWS_SESSION_TOKEN (005/T4, P3)
+    "AWS_SHARED_CREDENTIALS_FILE",  # arquivo lido antes do papel (P3)
+    "AWS_CONFIG_FILE",  # idem, com chaves ou `credential_process` (P3)
 )
 
 

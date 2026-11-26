@@ -170,7 +170,7 @@ class AssinadorDeRelatorio(Protocol):
 | `REPORT_SIGNING_KEYS_FILE` (ou `REPORT_SIGNING_KEYS`) | `/run/secrets/report-keys.json` | obrigatória com `S3_BUCKET`; em `prod`, chave de exemplo recusada; nenhuma chave igual às JWT | R5.1, R5.2 |
 | `REPORT_RETENTION_DAYS` | `90` | 1 a 3650 | G1 (guarda de 90 dias) |
 
-- **Recusas em `prod` (R2.9).** Falta de `S3_BUCKET`, `S3_ASSUME_ROLE_ARN`, `S3_EXTERNAL_ID` ou `S3_KMS_KEY_ID` em ARN; `S3_SSE` diferente de `aws:kms`; qualquer chave fixa configurada. Chave fixa é `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, ou as variáveis do SDK `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` e `AWS_PROFILE`, que `Settings` declara só para recusar.
+- **Recusas em `prod` (R2.9).** Falta de `S3_BUCKET`, `S3_ASSUME_ROLE_ARN`, `S3_EXTERNAL_ID` ou `S3_KMS_KEY_ID` em ARN; `S3_SSE` diferente de `aws:kms`; qualquer chave fixa configurada. Chave fixa é `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, ou as variáveis do SDK `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_SECURITY_TOKEN`, `AWS_PROFILE`, `AWS_DEFAULT_PROFILE`, `AWS_SHARED_CREDENTIALS_FILE` e `AWS_CONFIG_FILE`, que `Settings` declara só para recusar. Os arquivos compartilhados que nenhuma variável aponta (`~/.aws/credentials`, `~/.aws/config`) o adaptador S3 não lê (005/T4, P3 e P4, 26/11/2026).
 - A validade da URL é fixa em 300 s, no domínio, porque a R3.2 fixa o valor. O `REPORT_URL_TTL_SECONDS` do rascunho anterior sai.
 - `.env.example`: o bloco S3 passa aos valores do laboratório, com `https://` (corrige a contradição com a R2.7).
 

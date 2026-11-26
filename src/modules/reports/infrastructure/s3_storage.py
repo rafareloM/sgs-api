@@ -16,6 +16,7 @@ vai para log ou mensagem de erro, nem com `LOG_LEVEL=DEBUG` (`_silenciar_o_sdk`)
 """
 
 import logging
+import os
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -24,6 +25,7 @@ from functools import partial
 from typing import Any, BinaryIO, Literal, get_args
 
 import boto3
+import botocore.session
 from anyio import to_thread
 from botocore.config import Config
 
@@ -102,8 +104,16 @@ def _silenciar_o_sdk() -> None:
 
 
 def _novo_cliente(servico: str, **parametros: Any) -> Any:
-    """Uma `Session` por cliente: a `Session` do boto3 não é segura entre *threads*; o cliente é."""
-    return boto3.session.Session().client(servico, **parametros)
+    """Uma `Session` por cliente: a `Session` do boto3 não é segura entre *threads*; o cliente é.
+
+    A sessão não lê `~/.aws/credentials` nem `~/.aws/config` (005/T4, P3; R2.2): o botocore os
+    leria antes do papel do contêiner ou da instância, e nenhuma variável de ambiente denuncia
+    esses arquivos para a recusa da subida. As credenciais vêm só da configuração `S3_*` (as do
+    laboratório ou as temporárias do `AssumeRole`) e, para o STS, do ambiente de execução."""
+    sessao = botocore.session.get_session()
+    sessao.set_config_variable("credentials_file", os.devnull)
+    sessao.set_config_variable("config_file", os.devnull)
+    return boto3.session.Session(botocore_session=sessao).client(servico, **parametros)
 
 
 class S3ArmazenamentoDeObjetos:

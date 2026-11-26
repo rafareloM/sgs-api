@@ -146,6 +146,11 @@ class Settings(BaseSettings):
     aws_session_token: SecretStr | None = None
     aws_profile: str | None = None
     aws_default_profile: str | None = None  # nome antigo do AWS_PROFILE, ainda lido pelo botocore
+    aws_security_token: SecretStr | None = None  # nome antigo do AWS_SESSION_TOKEN (botocore)
+    # Arquivos que o botocore lê antes do papel do contêiner (005/T4, P3): o de credenciais, e o
+    # de configuração, que pode trazer chaves ou `credential_process`.
+    aws_shared_credentials_file: str | None = None
+    aws_config_file: str | None = None
     # Guarda dos relatórios no bucket, em dias (G1 da 005).
     report_retention_days: int = Field(default=90, ge=1, le=3650)
 
@@ -165,6 +170,9 @@ class Settings(BaseSettings):
         "aws_session_token",
         "aws_profile",
         "aws_default_profile",
+        "aws_security_token",
+        "aws_shared_credentials_file",
+        "aws_config_file",
         mode="before",
     )
     @classmethod
@@ -480,6 +488,9 @@ class Settings(BaseSettings):
             "AWS_SESSION_TOKEN": self.aws_session_token,
             "AWS_PROFILE": self.aws_profile,
             "AWS_DEFAULT_PROFILE": self.aws_default_profile,
+            "AWS_SECURITY_TOKEN": self.aws_security_token,
+            "AWS_SHARED_CREDENTIALS_FILE": self.aws_shared_credentials_file,
+            "AWS_CONFIG_FILE": self.aws_config_file,
         }
         problems.extend(
             f"{name}: chave fixa não é aceita em prod; o acesso é pelo papel de S3_ASSUME_ROLE_ARN"
