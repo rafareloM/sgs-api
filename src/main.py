@@ -41,11 +41,16 @@ from src.modules.audit.infrastructure.repository import SqlAuditStore
 from src.modules.dashboard.api import rotas as dashboard
 from src.modules.dashboard.infrastructure.consultas import SqlConsultasDashboard
 from src.modules.identity.api import auth, diretorio, jwks
+from src.modules.identity.api import oidc as login_oidc
 from src.modules.identity.api.sincronizacao import transacoes_da_sincronizacao
 from src.modules.identity.application.agendamento import agendar, sincronizar_agendada
 from src.modules.identity.application.sincronizacao import marcar_interrompidas
 from src.modules.identity.domain.cron import Agenda, CronInvalido, analisar
-from src.modules.identity.infrastructure.directory_repository import SqlDirectoryRepository
+from src.modules.identity.infrastructure.authlib_oidc import AuthlibOidc
+from src.modules.identity.infrastructure.directory_repository import (
+    SqlDirectoryRepository,
+    SqlOidcLoginRequests,
+)
 from src.modules.identity.infrastructure.ldap3_directory import Ldap3Directory, LdapConfig
 from src.modules.identity.infrastructure.passwords import Argon2PasswordHasher
 from src.modules.identity.infrastructure.repository import (
@@ -216,6 +221,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.repositorio_de_atribuicoes = SqlRepositorioDeAtribuicoes
     app.state.repositorio_de_mapeamentos = SqlRepositorioDeMapeamentos
     app.state.repositorio_do_diretorio = SqlDirectoryRepository
+    # Spec 004 (T7): sem OIDC_ISSUER, o OIDC fica desligado (`/auth/provedores` diz qual está
+    # ligado; as rotas OIDC respondem 404). Limite próprio no início do login: cada chamada grava
+    # uma linha (design § Rotas).
+    app.state.oidc = AuthlibOidc.from_settings(settings) if settings.oidc_issuer else None
+    app.state.repositorio_de_login_oidc = SqlOidcLoginRequests
+    app.state.limite_de_oidc = LimiteDeRequisicoes("20/minute")
     # Spec 004: sem LDAP_URL, o LDAP fica desligado (login LDAP e sincronização respondem 503).
     ldap = LdapConfig.from_settings(settings)
     app.state.diretorio = None if ldap is None else Ldap3Directory(ldap)
@@ -243,6 +254,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(jwks.router)
     app.include_router(relatorios_jwks.router)
     app.include_router(auth.router)
+    app.include_router(login_oidc.router)
     app.include_router(acesso.router)
     app.include_router(diretorio.router)
     app.include_router(unidades.router)

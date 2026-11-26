@@ -12,20 +12,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from src.modules.access.application.mapeamentos import recalcular_derivadas_do_usuario
 from src.modules.access.domain.ports import (
     RepositorioDeAtribuicoes,
     RepositorioDeMapeamentos,
     RepositorioDePermissoes,
 )
-from src.modules.audit.application.registrar import Ator
+from src.modules.identity.application.grupos import espelhar_grupos
 from src.modules.identity.application.login import (
-    ORIGEM_API,
     Falha,
     Identidade,
     Origem,
     ResultadoDoLogin,
-    _auditar,
+    auditar,
     desafiar_ou_abrir_sessao,
 )
 from src.modules.identity.domain.diretorio import (
@@ -67,16 +65,16 @@ async def entrar_por_ldap(
 ) -> ResultadoDoLogin | Falha:
     """R2.1 a R2.4, R4.1, R4.3, R4.4 (design § Fluxo, Login LDAP, passos 1 a 7)."""
     if not senha:  # R2.4: nem chega ao diretório (evita bind anônimo aceito por engano)
-        await _auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
+        await auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
         return Falha()
     agora = deps.relogio()
     username = normalize_username(username)  # como o login local e o adaptador guardam
     local = await deps.usuarios.get_by_username(username)
     if local is not None and local.source is not UserSource.LDAP:  # R4.1
-        await _auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
+        await auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
         return Falha()
     if await _bloqueada(deps, local, agora):  # antes de qualquer chamada ao diretório
-        await _auditar(deps, "auth.login_failed", origem, _id(local), {"motivo": "bloqueado"})
+        await auditar(deps, "auth.login_failed", origem, _id(local), {"motivo": "bloqueado"})
         return Falha()
     porta = diretorio.porta
     if porta is None:
@@ -92,7 +90,7 @@ async def entrar_por_ldap(
         conta = await deps.usuarios.get_by_external_id(UserSource.LDAP, encontrado.external_id)
         alvo = conta or local
         if alvo is not local and await _bloqueada(deps, alvo, agora):  # antes do bind
-            await _auditar(deps, "auth.login_failed", origem, _id(alvo), {"motivo": "bloqueado"})
+            await auditar(deps, "auth.login_failed", origem, _id(alvo), {"motivo": "bloqueado"})
             return Falha()
         if not await porta.verify_password(encontrado.dn, senha):
             await _falha_de_credencial(deps, origem, alvo)
@@ -130,11 +128,11 @@ async def _provisionar(
     agora = deps.relogio()
     conta = await deps.usuarios.get_by_external_id(UserSource.LDAP, dado.external_id)
     if conta is not None and not conta.is_active:  # R4.4: o login nunca reativa
-        await _auditar(deps, "auth.login_failed", origem, conta.id, {"motivo": "desativado"})
+        await auditar(deps, "auth.login_failed", origem, conta.id, {"motivo": "desativado"})
         return Falha()
     if conta is None:
         if await _ocupado(deps, dado.login, dado.email):  # R4.3: nada é unido nem criado
-            await _auditar(deps, "auth.login_failed", origem, None, {"motivo": "conflito_de_conta"})
+            await auditar(deps, "auth.login_failed", origem, None, {"motivo": "conflito_de_conta"})
             return Falha()
         nova = User(
             id=deps.gerar_id(),
@@ -145,7 +143,7 @@ async def _provisionar(
             external_id=dado.external_id,
         )
         await diretorio.repositorio.add_synced_user(nova, agora)
-        await _auditar(
+        await auditar(
             deps, "usuario.provisionado", origem, nova.id, {"origem": "ldap"}, tipo="sistema"
         )
         return nova
@@ -184,49 +182,35 @@ async def _espelhar_grupos(
     diretorio: Diretorio,
 ) -> None:
     """Passo 6 (R2.3): grupos do diretório, associações `ldap` do usuário e derivadas da 003."""
-    agora = deps.relogio()
-    ids: set[UUID] = set()
-    for grupo in grupos:
-        gravado = await diretorio.repositorio.upsert_group(
-            "ldap", grupo.external_id, grupo.name, agora
-        )
-        ids.add(gravado.id)
-    await diretorio.repositorio.replace_user_groups(usuario.id, "ldap", ids)
-    # O recálculo recebe todos os grupos atuais do usuário, de todas as origens (003/R3.2).
-    outros = await diretorio.repositorio.groups_of_user(usuario.id, "oidc")
-    await recalcular_derivadas_do_usuario(
+    await espelhar_grupos(
         usuario.id,
-        frozenset(ids) | outros,
-        # O recálculo é ato do sistema, disparado pelo login (013/R1.1).
-        ator=Ator(
-            tipo="sistema",
-            origem=ORIGEM_API,
-            ip=origem.ip,
-            user_agent=origem.user_agent,
-            request_id=origem.request_id,
-        ),
+        "ldap",
+        [(grupo.external_id, grupo.name) for grupo in grupos],
+        repositorio=diretorio.repositorio,
         mapeamentos=diretorio.mapeamentos,
         atribuicoes=diretorio.atribuicoes,
         permissoes=diretorio.permissoes,
         auditoria=deps.auditoria,
+        origem=origem,
         gerar_id=deps.gerar_id,
+        agora=deps.relogio(),
     )
 
 
 async def _falha_de_credencial(deps: Identidade, origem: Origem, local: User | None) -> None:
     """Senha errada ou usuário fora do diretório: conta a falha se houver conta (002/R1.4)."""
     if local is None:
-        await _auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
+        await auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
         return
     agora = deps.relogio()
     depois = await deps.estados.registrar_falha(local.id, agora)
-    await _auditar(deps, "auth.login_failed", origem, local.id, {"motivo": "credenciais"})
+    await auditar(deps, "auth.login_failed", origem, local.id, {"motivo": "credenciais"})
     if depois.bloqueado(agora):
-        await _auditar(deps, "auth.locked", origem, local.id, {}, tipo="sistema")
+        await auditar(deps, "auth.locked", origem, local.id, {}, tipo="sistema")
 
 
 async def _indisponivel(deps: Identidade, origem: Origem, local: User | None) -> Falha:
-    await _auditar(
+    await auditar(
         deps,
         "auth.login_failed",
         origem,

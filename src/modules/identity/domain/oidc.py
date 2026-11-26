@@ -5,6 +5,9 @@ O adaptador (Authlib e PyJWT) fica em `infrastructure/authlib_oidc.py`. Ele mont
 autorização, troca o código e confere o `id_token` antes de devolver um `OidcIdentity`.
 """
 
+import base64
+import hashlib
+import hmac
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Protocol
@@ -64,3 +67,19 @@ class OidcPort(Protocol):
         """Troca o código e confere o `id_token`: assinatura, `iss`, `aud`, `exp`, `nonce` (R3.2)
         e, com OIDC_REQUIRED_ACR, o `acr` (R3.6). Levanta `OidcRejected` com o motivo."""
         ...
+
+
+def hash_do_valor(valor: str) -> str:
+    """SHA-256 em hex do `state` ou do vínculo: só o hash fica no banco (D004-2)."""
+    return hashlib.sha256(valor.encode()).hexdigest()
+
+
+def mesmo_valor(a: str, b: str) -> bool:
+    """Comparação em tempo constante dos hashes."""
+    return hmac.compare_digest(a, b)
+
+
+def code_challenge_s256(code_verifier: str) -> str:
+    """PKCE S256 (RFC 7636 § 4.2): base64url, sem `=`, do SHA-256 do `code_verifier`."""
+    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")

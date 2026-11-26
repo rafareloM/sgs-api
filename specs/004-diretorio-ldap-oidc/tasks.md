@@ -216,7 +216,8 @@ O mesmo quadro está em `specs/005-exportacao-relatorios-s3/tasks.md`. Cada fren
   - Bloqueada por: —
   - Requisitos: R3.9
   - Pronto quando: `tests/e2e_front/test_login_oidc.py` passa (Playwright, API simulada por `page.route`)
-- [ ] T7. Rotas OIDC: provedores, início e callback
+- [x] T7. Rotas OIDC: provedores, início e callback
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/identity/test_oidc_callback.py`, `tests/architecture/test_rotas_protegidas.py`
   - Frente: B
   - Faz:
     - `identity/api/oidc.py`: `GET /auth/provedores`, `GET /auth/oidc/login` com cookie de vínculo e limite por IP, e `GET /auth/oidc/callback`;

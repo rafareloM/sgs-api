@@ -42,6 +42,8 @@ __all__ = [
     "Origem",
     "ResultadoDoLogin",
     "TokensEmitidos",
+    "abrir_sessao",
+    "auditar",
     "cadastrar_mfa",
     "confirmar_mfa",
     "desafiar_ou_abrir_sessao",
@@ -55,7 +57,7 @@ __all__ = [
 ORIGEM_API = "api"
 """Rótulo de origem dos eventos de autenticação, gravados pelas rotas da API (013/R1.1)."""
 
-_FALHAS_DE_AUTENTICACAO = frozenset({"auth.login_failed", "auth.mfa_failed"})
+_FALHAS_DE_AUTENTICACAO = frozenset({"auth.login_failed", "auth.mfa_failed", "auth.oidc_failed"})
 """013/R4.2: resultado `failure`, categoria `autenticacao`. Os demais eventos `auth.*` (login,
 logout, 2FA cadastrado, bloqueio, reuso de refresh) registram uma ação que aconteceu: `success`."""
 
@@ -134,23 +136,23 @@ async def entrar(
     usuario = await deps.usuarios.get_by_username(username)
     if usuario is None or usuario.source is not UserSource.LOCAL or usuario.password_hash is None:
         deps.hasher.verificar_ficticio(senha)
-        await _auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
+        await auditar(deps, "auth.login_failed", origem, None, {"motivo": "credenciais"})
         return Falha()
     estado = await deps.estados.estado(usuario.id)
     if estado is None:  # pragma: no cover - acabou de ser lido
         return Falha()
     if estado.bloqueado(agora):
         deps.hasher.verificar_ficticio(senha)
-        await _auditar(deps, "auth.login_failed", origem, usuario.id, {"motivo": "bloqueado"})
+        await auditar(deps, "auth.login_failed", origem, usuario.id, {"motivo": "bloqueado"})
         return Falha()
     if not deps.hasher.verificar(senha, usuario.password_hash):
         depois = await deps.estados.registrar_falha(usuario.id, agora)
-        await _auditar(deps, "auth.login_failed", origem, usuario.id, {"motivo": "credenciais"})
+        await auditar(deps, "auth.login_failed", origem, usuario.id, {"motivo": "credenciais"})
         if depois.bloqueado(agora):
-            await _auditar(deps, "auth.locked", origem, usuario.id, {}, tipo="sistema")
+            await auditar(deps, "auth.locked", origem, usuario.id, {}, tipo="sistema")
         return Falha()
     if not usuario.is_active:
-        await _auditar(deps, "auth.login_failed", origem, usuario.id, {"motivo": "desativado"})
+        await auditar(deps, "auth.login_failed", origem, usuario.id, {"motivo": "desativado"})
         return Falha()
 
     await deps.estados.registrar_sucesso(usuario.id, agora)
@@ -163,7 +165,7 @@ async def desafiar_ou_abrir_sessao(
     """Depois da senha conferida (local ou no diretório): o desafio do 2FA (R1.1, R1.2) ou, com
     o 2FA desligado em dev, a sessão."""
     if not deps.mfa_obrigatorio:  # só em dev (Settings recusa fora dele)
-        tokens = await _abrir_sessao(deps, usuario, _amr(usuario, otp=False), origem)
+        tokens = await abrir_sessao(deps, usuario, _amr(usuario, otp=False), origem)
         return ResultadoDoLogin(tokens=tokens)
     finalidade = MfaPurpose.VERIFY if estado.mfa_enabled else MfaPurpose.ENROLL
     emitido = deps.tokens.issue_mfa_token(usuario.id, finalidade)
@@ -219,7 +221,7 @@ async def _concluir_mfa(
     reuso = passo is not None and estado.mfa_last_step is not None and passo <= estado.mfa_last_step
     if passo is None or reuso:
         tentativas = await deps.estados.falha_de_mfa(usuario.id)
-        await _auditar(
+        await auditar(
             deps,
             "auth.mfa_failed",
             origem,
@@ -234,8 +236,8 @@ async def _concluir_mfa(
     ativar = finalidade is MfaPurpose.ENROLL
     await deps.estados.concluir_mfa(usuario.id, passo, ativar=ativar)
     if ativar:
-        await _auditar(deps, "auth.mfa_enrolled", origem, usuario.id, {})
-    return await _abrir_sessao(deps, usuario, _amr(usuario, otp=True), origem)
+        await auditar(deps, "auth.mfa_enrolled", origem, usuario.id, {})
+    return await abrir_sessao(deps, usuario, _amr(usuario, otp=True), origem)
 
 
 def _amr(usuario: User, *, otp: bool) -> str:
@@ -280,7 +282,7 @@ async def renovar(
         registro.id, agora
     ):
         await deps.revogacao.revogar(sessao.id, agora)
-        await _auditar(deps, "auth.refresh_reuse", origem, sessao.user_id, {}, sessao_id=sessao.id)
+        await auditar(deps, "auth.refresh_reuse", origem, sessao.user_id, {}, sessao_id=sessao.id)
         return Falha("Sessão expirada.")
     usuario = await deps.usuarios.get_by_id(sessao.user_id)
     if (
@@ -297,15 +299,13 @@ async def renovar(
 async def sair(usuario_id: UUID, sessao_id: UUID, *, origem: Origem, deps: Identidade) -> None:
     """R3.7: revoga a sessão e os refresh dela; audita `auth.logout`."""
     await deps.revogacao.revogar(sessao_id, deps.relogio())
-    await _auditar(deps, "auth.logout", origem, usuario_id, {}, sessao_id=sessao_id)
+    await auditar(deps, "auth.logout", origem, usuario_id, {}, sessao_id=sessao_id)
 
 
 # ------------------------------------------------------------------- auxiliares
 
 
-async def _abrir_sessao(
-    deps: Identidade, usuario: User, amr: str, origem: Origem
-) -> TokensEmitidos:
+async def abrir_sessao(deps: Identidade, usuario: User, amr: str, origem: Origem) -> TokensEmitidos:
     agora = deps.relogio()
     sessao = AuthSession(
         id=deps.gerar_id(),
@@ -318,7 +318,7 @@ async def _abrir_sessao(
     await deps.sessoes.add(sessao)
     tokens = await _emitir(deps, sessao, deps.gerar_id(), agora)
     papeis = await deps.papeis.de(usuario.id) if deps.papeis is not None else ()
-    await _auditar(
+    await auditar(
         deps,
         "auth.login",
         origem,
@@ -353,7 +353,7 @@ async def _emitir(
     )
 
 
-async def _auditar(
+async def auditar(
     deps: Identidade,
     acao: str,
     origem: Origem,

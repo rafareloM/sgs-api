@@ -23,6 +23,12 @@ PUBLICAS = {
     "/api/v1/auth/mfa/verify",
     "/api/v1/auth/refresh",
     "/api/v1/auth/logout",
+    # Spec 004 (design § Rotas): `provedores` só diz se cada origem de login está ligada;
+    # `oidc/login` e `oidc/callback` acontecem antes de existir usuário (o callback confere o
+    # `state` de uso único preso ao navegador, R3.7).
+    "/api/v1/auth/provedores",
+    "/api/v1/auth/oidc/login",
+    "/api/v1/auth/oidc/callback",
     # Fora de /api/v1, como o JWKS da 002, mas listada para registrar a justificativa: só publica
     # chaves públicas, para quem recebe um relatório conferir a assinatura sem conta na
     # plataforma (design da 005, § Rotas e § Segurança; R5.4).

@@ -419,6 +419,152 @@
         ]
       }
     },
+    "/api/v1/auth/provedores": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Origens de login ligadas",
+        "description": "R3.9: a tela de login mostra a entrada OIDC só com o OIDC ligado.",
+        "operationId": "provedores_api_v1_auth_provedores_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvedoresOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oidc/login": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Começar o login pelo provedor de identidade",
+        "description": "R3.1, R3.8: Authorization Code com PKCE S256, `state` e `nonce`; o `redirect_uri` vem da\nconfiguração.",
+        "operationId": "login_oidc_api_v1_auth_oidc_login_get",
+        "responses": {
+          "302": {
+            "description": "Para o provedor, com o cookie de vínculo `sgs_oidc`"
+          },
+          "404": {
+            "description": "OIDC não configurado",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "429": {
+            "description": "Limite de 20 por minuto por IP",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Provedor indisponível",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oidc/callback": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Retorno do provedor de identidade",
+        "description": "R3.2 a R3.7, R4.3, R4.4: sempre 302, nunca JSON.",
+        "operationId": "callback_oidc_api_v1_auth_oidc_callback_get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "name": "sgs_oidc",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sgs Oidc"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Para o front, com a sessão ou com `login_erro=oidc`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -7701,6 +7847,24 @@
           "formato"
         ],
         "title": "PedidoDoInventarioIn"
+      },
+      "ProvedoresOut": {
+        "properties": {
+          "ldap": {
+            "type": "boolean",
+            "title": "Ldap"
+          },
+          "oidc": {
+            "type": "boolean",
+            "title": "Oidc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ldap",
+          "oidc"
+        ],
+        "title": "ProvedoresOut"
       },
       "QualidadeOut": {
         "properties": {
