@@ -507,3 +507,26 @@ async def test_recalculo_mantem_as_derivadas_de_grupos_oidc(
     await _executar(transacoes, diretorio)
 
     assert await _papeis_derivados(sessoes, id_ana) == ["AUDITOR"]
+
+
+async def test_retrato_sem_usuarios_com_contas_ldap_ativas_falha_sem_desativar(
+    sessoes: Sessoes, transacoes: Any, diretorio: DiretorioFalso
+) -> None:
+    """004/R1.7, R1.10 (revisão da frente A, S5: um filtro ou base errados devolveriam um
+    retrato vazio, e a R1.7 desativaria todas as contas LDAP)"""
+    ana = pessoa("ana")
+    diretorio.usuarios = [ana]
+    diretorio.grupos = [grupo("ti", ana)]
+    await _executar(transacoes, diretorio)
+    antes = await _contagens(sessoes)
+    diretorio.usuarios, diretorio.grupos = [], []
+
+    execucao = await _executar(transacoes, diretorio)
+
+    assert await _contagens(sessoes) == antes
+    assert (await _usuarios_ldap(sessoes))["uuid-ana"]["is_active"] is True
+    run = await _execucao(sessoes, execucao)
+    assert (run["status"], run["error"]) == (
+        "falhou",
+        "Diretório sem usuários; nada foi desativado",
+    )

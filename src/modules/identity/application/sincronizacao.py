@@ -40,10 +40,17 @@ ENTIDADE = "execucao_diretorio"
 ERRO_DIRETORIO = "Diretório indisponível"
 ERRO_GERAL = "Falha na sincronização"
 ERRO_INTERROMPIDA = "Interrompida"
+ERRO_RETRATO_VAZIO = "Diretório sem usuários; nada foi desativado"
 # A subida da API fecha o que ficou em andamento: é o próprio sistema, não uma pessoa.
 ATOR_DA_SUBIDA = Ator(tipo="sistema", origem="api")
 
 _log = logging.getLogger("sgs_api.diretorio")
+
+
+class RetratoVazio(Exception):  # noqa: N818 (sinal interno, vira a falha da execução)
+    """Revisão da frente A, S5 (critério mínimo, 26/11/2026): um retrato sem nenhum usuário,
+    com contas LDAP ativas no banco, é quase certamente um filtro ou base errados, e a R1.7
+    desativaria todo mundo. A execução falha sem tocar em nada."""
 
 
 @dataclass(frozen=True)
@@ -94,6 +101,11 @@ async def sincronizar(
     except DirectoryUnavailable:
         _log.warning("sincronização do diretório falhou: diretório indisponível")
         await _falhou(execucao_id, ERRO_DIRETORIO, transacoes=transacoes, ator=ator, agora=agora)
+    except RetratoVazio:
+        _log.warning("sincronização do diretório recusada: retrato sem usuários")
+        await _falhou(
+            execucao_id, ERRO_RETRATO_VAZIO, transacoes=transacoes, ator=ator, agora=agora
+        )
     except Exception as erro:
         # Só o tipo do erro: a mensagem pode trazer dados do diretório (e-mails, nomes).
         _log.error("sincronização do diretório falhou: %s", type(erro).__name__)
@@ -121,6 +133,10 @@ async def _aplicar(
 ) -> None:
     instante = agora()
     estado = await repos.diretorio.local_state(ORIGEM)
+    if not retrato.users and any(
+        u.source is UserSource.LDAP and u.is_active for u in estado.usuarios
+    ):
+        raise RetratoVazio
     plano = planejar(retrato, estado)
     # `external_id` → id das contas `ldap` que já existem; as criadas entram abaixo.
     usuarios = {
