@@ -85,7 +85,7 @@ Como o vínculo do serviço guarda `unit_id` (e não o nome da unidade), o probl
 
 | Tabela | Colunas | Observações |
 |---|---|---|
-| `report_jobs` | `id`, `report_type` (`inventario_unidades`/`trilha_auditoria`), `format` (`csv`/`xlsx`), `filters` (JSONB), `requested_by`, `scope_snapshot` (JSONB), `status` (`pendente`/`gerando`/`concluido`/`falhou`), `storage_bucket`, `storage_key`, `size_bytes`, `sha256`, `error`, `created_at`, `finished_at`, `expires_at` | `scope_snapshot` registra com que escopo o relatório foi gerado |
+| `report_jobs` | `id`, `report_type` (`inventario_unidades`/`trilha_auditoria`), `format` (`csv`/`xlsx`), `filters` (JSONB), `requested_by`, `scope_snapshot` (JSONB), `status` (`pendente`/`gerando`/`concluido`/`falhou`), `storage_bucket`, `storage_key`, `storage_version_id`, `size_bytes`, `sha256` (hex), `signature`, `signature_alg`, `signature_kid`, `error` (até 200), `created_at`, `updated_at`, `started_at`, `finished_at`, `expires_at` | Migração `0005_relatorios` (spec 005). `scope_snapshot` registra com que escopo o relatório foi gerado (R1.3). `storage_version_id` permite remover exatamente o objeto gravado (R2.8). Assinatura, algoritmo e `kid` do hash (R5.1). `CHECK`: `concluido` exige `storage_key`, `sha256` e a assinatura completa. Índices: `(requested_by, created_at DESC)` e parcial em `status` para `pendente`/`gerando` |
 
 ## 5. Criptografia de campos
 

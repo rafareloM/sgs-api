@@ -15,6 +15,7 @@ from src.modules.access.infrastructure import tables as _access  # noqa: F401 - 
 from src.modules.audit.infrastructure import tables as _audit  # noqa: F401
 from src.modules.identity.infrastructure import tables as _identity  # noqa: F401
 from src.modules.registry.infrastructure import tables as _registry  # noqa: F401
+from src.modules.reports.infrastructure import tables as _reports  # noqa: F401
 from tests.integration.postgres import BancoDeTeste, motor
 
 

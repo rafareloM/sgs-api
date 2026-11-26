@@ -70,7 +70,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: —
   - Requisitos: R1.2, R1.5, R3.3
   - Pronto quando: `tests/unit/reports/test_filtros.py` e `tests/unit/reports/test_escopo_cobre.py` passam
-- [ ] T1. Migração `0005_relatorios` e repositório de pedidos
+- [x] T1. Migração `0005_relatorios` e repositório de pedidos
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_report_jobs.py`
   - Frente: C
   - Faz:
     - `report_jobs` com versão do objeto, colunas de assinatura, `CHECK` de coerência e índices;
