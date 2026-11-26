@@ -1,0 +1,48 @@
+# Laboratório na AWS (spec 005, T13): sobreposição do docker/compose.yml para uma instância EC2 do
+# Learner Lab. Uso, na instância (o user-data já faz isso):
+#   docker compose -f docker/compose.yml -f docker/aws/compose.aws.yml up -d --build --wait
+#
+# O que muda em relação ao compose local:
+# - o S3 é um bucket real: sem SeaweedFS (`s3` e `s3-init` ficam no perfil `seaweedfs`, que não
+#   sobe); a API envia pelos endereços HTTPS padrão da AWS, com AssumeRole na LabRole a cada
+#   operação (R2.1), `aws:kms` na chave gerenciada aws/s3 (R2.3) e sem chave fixa (R2.2);
+# - o Caddy usa nomes sslip.io do IP elástico, com certificados Let's Encrypt (docker/aws/Caddyfile);
+# - o Keycloak tem a heap limitada, para caber num t3.small com swap.
+#
+# As variáveis SGS_LAB_* e SGS_PUBLIC_* vêm do docker/.env que o user-data escreve na instância.
+# A API continua em dev (decisão do Rafael, 26/11/2026): as senhas de exemplo do laboratório são
+# aceitas, e a porta 443 só abre para a lista de IPs da equipe (docker/aws/lab.sh).
+
+services:
+  api:
+    environment:
+      S3_BUCKET: ${SGS_LAB_BUCKET:?defina SGS_LAB_BUCKET (docker/aws/lab.sh subir)}
+      S3_REGION: ${SGS_LAB_REGIAO:-us-east-1}
+      # Vazios valem como ausentes: endereços HTTPS padrão da AWS, CAs do sistema.
+      S3_ENDPOINT_URL: ""
+      S3_PUBLIC_ENDPOINT_URL: ""
+      S3_CA_FILE: ""
+      S3_ADDRESSING_STYLE: virtual
+      S3_ASSUME_ROLE_ARN: ${SGS_LAB_PAPEL_ARN:?defina SGS_LAB_PAPEL_ARN (ARN da LabRole)}
+      S3_EXTERNAL_ID: ${SGS_LAB_EXTERNAL_ID:?defina SGS_LAB_EXTERNAL_ID}
+      S3_SSE: aws:kms
+      S3_KMS_KEY_ID: ${SGS_LAB_CHAVE_KMS_ARN:?defina SGS_LAB_CHAVE_KMS_ARN (ARN da chave aws/s3)}
+      # Nada de chave fixa: a identidade vem do perfil da instância (IMDSv2, salto 2).
+      S3_ACCESS_KEY_ID: ""
+      S3_SECRET_ACCESS_KEY: ""
+
+  keycloak:
+    environment:
+      JAVA_OPTS_KC_HEAP: -Xms128m -Xmx512m
+
+  proxy:
+    environment:
+      SGS_LAB_HOST: ${SGS_LAB_HOST:?defina SGS_LAB_HOST (o nome sslip.io do IP elástico)}
+    volumes:
+      - ./aws/Caddyfile:/etc/caddy/Caddyfile:ro
+
+  s3:
+    profiles: [seaweedfs]
+
+  s3-init:
+    profiles: [seaweedfs]
