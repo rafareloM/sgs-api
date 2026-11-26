@@ -171,7 +171,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: —
   - Requisitos: R2.1, R2.3
   - Pronto quando: o documento foi revisado por um integrante
-- [ ] T8. SeaweedFS no compose e demonstração ponta a ponta
+- [x] T8. SeaweedFS no compose e demonstração ponta a ponta
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/e2e/test_export_s3.py -m slow` (3 passed)
   - Frente: C
   - Primeira hora: conferir de novo, já no compose, a SSE e o TLS vistos na T10.
   - Faz:

@@ -243,6 +243,10 @@ Usa o `servicos-certs` e as redes `integracoes` e `exposicao` do design da 004 (
 
 - **Endereço público.** `s3.localhost` resolve para o próprio host nos navegadores. É um host, não um prefixo de caminho, porque o caminho entra na assinatura (D004-14). Com `SGS_HTTPS_PORT` diferente de 443, `SGS_PUBLIC_S3_URL` leva a porta (README).
 - **Criptografia no SeaweedFS.** Conferida na primeira hora da T8 (G1). Se a resposta do `PutObject` não trouxer `ServerSideEncryption: AES256`, a T8 para e a decisão volta ao dono antes de seguir. As opções são as da pergunta de 24/11/2026: outro armazenamento compatível, ou aceitar em dev só a conferência do checksum (a R2.8 em dev ficaria sem a parte da criptografia).
+- **Chave da SSE do laboratório (Decisão do Rafael, 26/11/2026).** Segredo em arquivo, gerado em `secrets/` como as outras chaves do laboratório (`src.tools.s3_sse_key` → `secrets/s3-security.toml`, com `[s3.sse] key`) e montado no `s3` como segredo em `/etc/seaweedfs/security.toml`, nunca como variável de ambiente. O `s3-init` também liga o versionamento do bucket (`weed shell`, `s3.bucket.versioning -enable`).
+- **Conferido na T8 (26/11/2026), já no compose.** O S3 só fala HTTPS na 8333 (HTTP recebe 400), e o objeto fica com `AES256`, o `ChecksumSHA256` enviado e uma `VersionId`, num bucket com versionamento `Enabled` (`tests/e2e/test_export_s3.py`). Dois ajustes que a T10 não pegou:
+  - o entrypoint da imagem troca para o usuário `seaweed` (uid 1000) com `su-exec`; com a chave do certificado `s3` de root (`0600`), o TLS trava no handshake sem nenhum erro no log. O `servicos-certs` passa a dar a chave ao uid 1000 e acerta o dono nos volumes antigos;
+  - com o `s3` em duas redes (`integracoes`, `exposicao`), o master anuncia o IP de uma delas, e o `s3-init`, só na `integracoes`, não o alcança: o `weed server` sobe com `-ip=s3 -ip.bind=0.0.0.0`.
 - **Roteiro (R6.3).** `docs/operacao/demo-relatorios.md`:
   1. pedir o relatório pelo `/docs`;
   2. acompanhar o status;

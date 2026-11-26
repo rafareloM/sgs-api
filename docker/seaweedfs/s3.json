@@ -1,0 +1,18 @@
+{
+  "identities": [
+    {
+      "name": "sgs-api",
+      "credentials": [
+        {
+          "accessKey": "sgs-lab-exemplo",
+          "secretKey": "sgs-lab-exemplo-s3"
+        }
+      ],
+      "actions": [
+        "Read:sgs-relatorios",
+        "Write:sgs-relatorios",
+        "List:sgs-relatorios"
+      ]
+    }
+  ]
+}

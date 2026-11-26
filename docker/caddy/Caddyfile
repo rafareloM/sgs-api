@@ -40,3 +40,18 @@ keycloak.localhost {
 		}
 	}
 }
+
+# Spec 005 (design § Ambiente de demonstração; D005-7): o S3 de laboratório num host próprio, na
+# mesma porta, para o navegador baixar pela URL pré-assinada (R6.2). O `Host` original passa
+# adiante (padrão do Caddy): a assinatura SigV4 da URL foi feita com ele. O Caddy confere o
+# certificado do SeaweedFS pela CA de laboratório e pelo nome `s3`.
+s3.localhost {
+	tls internal
+
+	reverse_proxy https://s3:8333 {
+		transport http {
+			tls_trust_pool file /certs-servicos/ca.crt
+			tls_server_name s3
+		}
+	}
+}

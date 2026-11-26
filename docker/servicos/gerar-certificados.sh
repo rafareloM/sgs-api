@@ -13,12 +13,14 @@
 #   <serviço>/server.crt           certificado do servidor              (root, 0644)
 #   <serviço>/server.key           chave, com o uid do usuário do contêiner do serviço (0600):
 #                                  ldap 389 (fixado no docker/ldap/Dockerfile), keycloak 1000
-#                                  (usuário da imagem), s3 0 (a imagem do SeaweedFS roda como root)
+#                                  (usuário da imagem), s3 1000 (o entrypoint do SeaweedFS troca
+#                                  para o usuário `seaweed`, uid 1000, com su-exec; com a chave
+#                                  de root, o TLS do S3 trava sem erro no log, 005/T8)
 # Para gerar de novo, apague o volume (`docker compose -f docker/compose.yml down -v`).
 set -eu
 
 destino=/certs
-servicos="ldap:389 keycloak:1000 s3:0"
+servicos="ldap:389 keycloak:1000 s3:1000"
 
 faltando=0
 [ -s "$destino/ca/ca.crt" ] || faltando=1
@@ -27,6 +29,12 @@ for item in $servicos; do
     [ -s "$destino/$nome/server.crt" ] && [ -s "$destino/$nome/server.key" ] || faltando=1
 done
 if [ "$faltando" -eq 0 ]; then
+    # Volumes de antes da 005/T8 têm a chave do s3 com o uid 0: o dono é acertado a cada subida.
+    for item in $servicos; do
+        nome=${item%%:*}
+        uid=${item##*:}
+        chown "$uid:$uid" "$destino/$nome/server.key"
+    done
     echo "servicos-certs: certificados já existem; nada a fazer"
     exit 0
 fi

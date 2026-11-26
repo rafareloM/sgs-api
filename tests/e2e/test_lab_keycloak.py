@@ -360,7 +360,7 @@ def test_servicos_certs_gera_os_tres_certificados_sem_a_chave_da_ca(ca_do_caddy:
         "/certs/ldap/server.crt 0 644",
         "/certs/ldap/server.key 389 600",
         "/certs/s3/server.crt 0 644",
-        "/certs/s3/server.key 0 600",
+        "/certs/s3/server.key 1000 600",
     ]
     for servico in ("api", "proxy"):
         assert _compose("exec", "-T", servico, "ls", "/certs-servicos").stdout.split() == ["ca.crt"]

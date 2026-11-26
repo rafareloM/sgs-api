@@ -106,11 +106,14 @@ def test_compose_exige_subnet_e_ip_do_proxy() -> None:
         "api": {"borda", "dados", "integracoes"},
         "keycloak": {"integracoes", "exposicao"},
         "ldap": {"integracoes"},
+        # Spec 005 (T8): a API envia pela `integracoes`; o navegador baixa pelo proxy.
+        "s3": {"integracoes", "exposicao"},
+        "s3-init": {"integracoes"},
         "proxy": {"borda", "exposicao"},
     }
     assert redes["api"] & redes["proxy"] == {"borda"}
     assert config["networks"]["integracoes"]["internal"] is True
-    for servico in ("api", "db", "keycloak", "ldap"):
+    for servico in ("api", "db", "keycloak", "ldap", "s3", "s3-init"):
         assert "ports" not in servicos[servico], servico
 
 
@@ -124,6 +127,7 @@ def test_subnets_das_suites_sao_unicas_e_fora_dos_pools_do_docker() -> None:
         "AUDITORIA": RAIZ / "tests" / "e2e" / "test_auditoria_proxy.py",
         "KEYCLOAK": RAIZ / "tests" / "e2e" / "test_lab_keycloak.py",
         "LDAP": RAIZ / "tests" / "e2e" / "test_lab_ldap.py",
+        "S3": RAIZ / "tests" / "e2e" / "test_export_s3.py",
     }
     assert set(suites) == set(SUBNETS)
     for suite, arquivo in suites.items():

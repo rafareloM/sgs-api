@@ -1,8 +1,8 @@
 # Ambiente local (spec 001, R1.1): API, PostgreSQL e proxy TLS.
 # A API conecta ao banco por TLS com verificação do certificado e do nome (spec 011, R10.3).
 # Laboratório da spec 004 (design § Ambiente): Keycloak em keycloak.localhost, pelo proxy, e LDAP
-# só por LDAPS, sem porta no host; o S3 local entra na 005/T8. A API não depende deles para ficar
-# saudável.
+# só por LDAPS, sem porta no host. Spec 005 (T8; design § Ambiente de demonstração): S3 local
+# (SeaweedFS) em HTTPS, em s3.localhost pelo proxy. A API não depende deles para ficar saudável.
 # Subir: docker compose -f docker/compose.yml up -d --build --wait (ver README).
 # As senhas abaixo são de desenvolvimento; a API recusa iniciar com elas em prod (001/R2.3).
 #
@@ -14,9 +14,10 @@
 # Spec 004 (D004-13): `integracoes` (interna) liga a API aos serviços de laboratório; `exposicao`
 # liga o proxy a eles. Proxy e API continuam só com a `borda` em comum (013/R3.1).
 #
-# Endereços públicos (spec 004): SGS_PUBLIC_URL (padrão https://localhost) e
-# SGS_PUBLIC_KEYCLOAK_URL (padrão https://keycloak.localhost) alimentam ao mesmo tempo o Keycloak
-# e a API. Com SGS_HTTPS_PORT diferente de 443, as duas levam a porta (README).
+# Endereços públicos (specs 004 e 005): SGS_PUBLIC_URL (padrão https://localhost),
+# SGS_PUBLIC_KEYCLOAK_URL (padrão https://keycloak.localhost) e SGS_PUBLIC_S3_URL (padrão
+# https://s3.localhost) alimentam ao mesmo tempo os serviços e a API. Com SGS_HTTPS_PORT diferente
+# de 443, as três levam a porta (README).
 name: sgs-api
 
 services:
@@ -134,6 +135,21 @@ services:
       LDAP_ATTR_NAME: cn
       LDAP_ATTR_ID: entryUUID
       LDAP_ATTR_MEMBER: member
+      # S3 do laboratório (spec 005, design § Configuração): envio direto ao SeaweedFS pela rede
+      # `integracoes`, em HTTPS conferido pela CA de laboratório (R2.7); as URLs de download saem
+      # no endereço público, assinadas para o host que o navegador usa (R3.6, D005-3). As chaves
+      # fixas de exemplo são recusadas em prod (R2.9).
+      S3_BUCKET: sgs-relatorios
+      S3_REGION: us-east-1
+      S3_ENDPOINT_URL: https://s3:8333
+      S3_PUBLIC_ENDPOINT_URL: ${SGS_PUBLIC_S3_URL:-https://s3.localhost}
+      S3_CA_FILE: /certs-servicos/ca.crt
+      S3_ADDRESSING_STYLE: path
+      S3_SSE: AES256
+      S3_ACCESS_KEY_ID: sgs-lab-exemplo
+      S3_SECRET_ACCESS_KEY: sgs-lab-exemplo-s3
+      # Chave de assinatura dos relatórios (spec 005, R5), outra que a JWT (ver README).
+      REPORT_SIGNING_KEYS_FILE: /run/secrets/report-keys.json
     volumes:
       # Só o certificado da CA. O usuário da API tem o mesmo uid do postgres (999); por isso a
       # chave do servidor não pode ser montada aqui.
@@ -143,7 +159,7 @@ services:
         read_only: true
         volume:
           subpath: ca
-      # Só a CA de laboratório (LDAP e Keycloak; S3 na 005).
+      # Só a CA de laboratório (LDAP, Keycloak e S3).
       - type: volume
         source: servicos-certs
         target: /certs-servicos
@@ -155,6 +171,8 @@ services:
         target: jwt-keys.json
       - source: crypto_keys
         target: crypto-keys.json
+      - source: report_keys
+        target: report-keys.json
     depends_on:
       db-certs:
         condition: service_completed_successfully
@@ -275,6 +293,78 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # S3 local (spec 005, R6.1; design § Ambiente de demonstração), sem porta no host: a API envia
+  # pela rede `integracoes` e o navegador baixa pelo proxy, em s3.localhost (R6.2). Tag e digest
+  # fixos, os conferidos na 005/T10. HTTPS direto na 8333, com o certificado `s3` do
+  # servicos-certs. A SSE-S3 (AES256, R2.8) exige uma chave: vem do segredo `s3_security`
+  # (security.toml com [s3.sse] key, gerado em secrets/; decisão do Rafael, 26/11/2026), nunca de
+  # variável de ambiente. Iceberg e Lance (HTTP) e a telemetria ficam desligados.
+  # A identidade da API (docker/seaweedfs/s3.json) só lê, grava e lista o bucket.
+  s3:
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+    command:
+      - server
+      - -dir=/data
+      # O `s3` está em duas redes: anuncia o nome do serviço, que as duas resolvem, e não o IP
+      # de uma delas (o `s3-init`, só na `integracoes`, não chegaria ao master).
+      - -ip=s3
+      - -ip.bind=0.0.0.0
+      - -master.telemetry=false
+      - -s3
+      - -s3.port=8333
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.cert.file=/certs/server.crt
+      - -s3.key.file=/certs/server.key
+    networks: [integracoes, exposicao]
+    volumes:
+      - s3-data:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - type: volume
+        source: servicos-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: s3
+    secrets:
+      - source: s3_security
+        target: /etc/seaweedfs/security.toml
+    depends_on:
+      servicos-certs:
+        condition: service_completed_successfully
+    # Pronto quando o S3 escuta a 8333 (208D), sem requisição (que pediria assinatura).
+    healthcheck:
+      test:
+        - CMD
+        - awk
+        - $$4 == "0A" && $$2 ~ /:208D$$/ {ok = 1} END {exit !ok}
+        - /proc/net/tcp
+        - /proc/net/tcp6
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  # Cria o bucket e liga o versionamento (a remoção pela versão da R2.8), sem erro se já existir
+  # (R6.1). One-shot, pelo `weed shell` no master do `s3`, sem passar pela identidade da API.
+  s3-init:
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        set -eu;
+        if ! echo s3.bucket.list | weed shell -master=s3:9333 | grep -qw sgs-relatorios; then
+        echo 's3.bucket.create -name sgs-relatorios' | weed shell -master=s3:9333; fi;
+        echo 's3.bucket.versioning -name sgs-relatorios -enable' | weed shell -master=s3:9333;
+        echo 's3.bucket.versioning -name sgs-relatorios' | weed shell -master=s3:9333
+        | grep -q 'Versioning: Enabled'
+    networks: [integracoes]
+    depends_on:
+      s3:
+        condition: service_healthy
+
   proxy:
     image: caddy:2
     networks:
@@ -291,7 +381,7 @@ services:
       - ../frontend/app:/srv/frontend:ro
       - caddy-data:/data
       - caddy-config:/config
-      # Só a CA de laboratório, para conferir o certificado do Keycloak (e do S3, na 005).
+      # Só a CA de laboratório, para conferir o certificado do Keycloak e do S3.
       - type: volume
         source: servicos-certs
         target: /certs-servicos
@@ -320,11 +410,16 @@ secrets:
     file: ../secrets/jwt-keys.json
   crypto_keys:
     file: ../secrets/crypto-keys.json
+  report_keys:
+    file: ../secrets/report-keys.json
+  s3_security:
+    file: ../secrets/s3-security.toml
 
 volumes:
   db-data:
   db-certs:
   servicos-certs:
   ldap-data:
+  s3-data:
   caddy-data:
   caddy-config:
