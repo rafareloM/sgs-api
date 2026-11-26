@@ -93,7 +93,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R1.2, R4.1, R4.2, R4.3
   - Pronto quando: `tests/unit/reports/test_generators.py` passa
-- [ ] T11. Consultas dos relatórios em SQL explícito
+- [x] T11. Consultas dos relatórios em SQL explícito
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_consultas_relatorio.py`
   - Frente: C
   - Faz:
     - `inventario_unidades.sql` (`vw_unit_inventory`), `trilha_auditoria_global.sql` e `trilha_auditoria_escopo.sql` (`vw_unit_history`), com cabeçalho (ADR-0009);

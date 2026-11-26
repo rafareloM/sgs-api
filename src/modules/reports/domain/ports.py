@@ -1,12 +1,15 @@
-"""Portas do módulo de relatórios: repositório de pedidos (spec 005, T1).
+"""Portas do módulo de relatórios: repositório de pedidos (spec 005, T1) e consultas (T11).
 
 O repositório trabalha sobre a transação de quem o usa: quem chama abre, confirma ou desfaz.
 """
 
+from collections.abc import AsyncGenerator, Sequence
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from src.modules.reports.domain.escopo import Escopo
+from src.modules.reports.domain.filtros import Filtros
 from src.modules.reports.domain.pedidos import (
     Conclusao,
     Pagina,
@@ -47,4 +50,18 @@ class RepositorioDePedidos(Protocol):
     ) -> tuple[list[PedidoDeRelatorio], int]:
         """Do mais recente ao mais antigo, com o total. `solicitado_por=None` lista os de todos
         (`GESTOR_DADOS`, R3.5)."""
+        ...
+
+
+TAMANHO_DO_LOTE = 1_000
+"""Linhas por lote do cursor do servidor (design § Geração e envio, passo 2)."""
+
+
+class ConsultasDeRelatorio(Protocol):
+    def lotes(
+        self, tipo: str, filtros: Filtros, escopo: Escopo, *, tamanho: int = TAMANHO_DO_LOTE
+    ) -> AsyncGenerator[list[Sequence[object]]]:
+        """As linhas do relatório `tipo`, na ordem de `COLUNAS_POR_TIPO[tipo]`, em lotes de até
+        `tamanho`, todas da mesma foto do banco e só do `escopo` gravado no pedido (R1.3). Quem
+        chama percorre até o fim, ou fecha o iterador (`aclosing`)."""
         ...
