@@ -51,6 +51,7 @@ class Bastidores:
     """Fábrica de clientes que grava o que o adaptador pede ao boto3 e o que o S3 responde."""
 
     clientes: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+    enderecos: list[str] = field(default_factory=list)
     papeis: list[dict[str, Any]] = field(default_factory=list)
     chaves_emitidas: list[str] = field(default_factory=list)
     segredos_emitidos: list[str] = field(default_factory=list)
@@ -60,6 +61,7 @@ class Bastidores:
     def novo_cliente(self, servico: str, **parametros: Any) -> Any:
         self.clientes.append((servico, parametros))
         cliente = boto3.session.Session().client(servico, **parametros)
+        self.enderecos.append(cliente.meta.endpoint_url)
         eventos = cliente.meta.events
         eventos.register("before-parameter-build.sts.AssumeRole", self._papel_pedido)
         eventos.register("after-call.sts.AssumeRole", self._papel_emitido)
@@ -309,6 +311,34 @@ async def test_clientes_conferem_a_ca_e_pedem_checksum_so_quando_exigido(
     assert config.request_checksum_calculation == "when_required"
     assert config.response_checksum_validation == "when_required"
     assert config.retries == {"mode": "standard"}
+
+
+async def test_endereco_aws_endpoint_url_do_ambiente_nao_desvia_os_clientes(
+    s3_falso: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """005/R2.7
+
+    Sem `S3_ENDPOINT_URL` (prod na AWS), o botocore aceitaria o endereço do `AWS_ENDPOINT_URL*`
+    do ambiente ou do arquivo de configuração compartilhado, inclusive em `http://`. Só a
+    configuração `S3_*` da API escolhe o endereço."""
+    for variavel in ("AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "AWS_ENDPOINT_URL_STS"):
+        monkeypatch.setenv(variavel, "http://127.0.0.1:9")
+    bastidores = Bastidores()
+    adaptador = _adaptador(bastidores, endpoint_url=None, public_endpoint_url=None)
+
+    gravado = await _enviar(adaptador)
+    await adaptador.remover(gravado.key, gravado.version_id, sessao=str(SOLICITANTE))
+    assinada = await adaptador.url_de_download(
+        KEY, nome="sgs-x-2026-11-25.csv", sessao=str(QUEM_BAIXA)
+    )
+
+    assert len(bastidores.enderecos) == 6  # STS e S3 em cada uma das três operações
+    assert [urlsplit(endereco).scheme for endereco in bastidores.enderecos] == ["https"] * 6
+    assert not [endereco for endereco in bastidores.enderecos if "127.0.0.1" in endereco]
+    partes = urlsplit(assinada.url)
+    assert (partes.scheme, partes.hostname) == ("https", "s3.amazonaws.com")
+    for config in (parametros["config"] for _, parametros in bastidores.clientes):
+        assert config.ignore_configured_endpoint_urls is True
 
 
 @pytest.mark.parametrize(

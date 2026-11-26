@@ -121,6 +121,9 @@ class S3ArmazenamentoDeObjetos:
         self._novo_cliente = novo_cliente
         self._relogio = relogio
         self._config_s3 = Config(
+            # Só `S3_ENDPOINT_URL` escolhe o endereço: sem isto, `AWS_ENDPOINT_URL*` do ambiente
+            # ou do arquivo compartilhado desviaria o cliente, até para `http://` (R2.7).
+            ignore_configured_endpoint_urls=True,
             signature_version="s3v4",
             retries={"mode": "standard"},
             s3={"addressing_style": configuracao.addressing_style},
@@ -233,7 +236,9 @@ class S3ArmazenamentoDeObjetos:
                 "aws_secret_access_key": self._cfg.secret_access_key or "",
             }
         sts = self._novo_cliente(
-            "sts", region_name=self._cfg.regiao, config=Config(retries={"mode": "standard"})
+            "sts",
+            region_name=self._cfg.regiao,
+            config=Config(retries={"mode": "standard"}, ignore_configured_endpoint_urls=True),
         )
         credenciais = sts.assume_role(
             RoleArn=self._cfg.assume_role_arn,
