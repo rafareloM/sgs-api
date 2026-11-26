@@ -42,6 +42,7 @@ uso() {
 		  liberar-ip           troca a lista de IPs da 443 (SGS_LAB_IPS ou o seu IP)
 		  parar | ligar        para ou liga a instância (o IP elástico fica)
 		  evidencia            confere o laboratório no ar e grava docs/operacao/evidencias/laboratorio-aws-<data>.json
+		  relatorio [csv|xlsx] exporta um relatório passo a passo, para demonstrar no console da AWS
 		  destruir --confirmo  apaga a instância, o IP, o bucket (com todas as versões) e o grupo
 	FIM
 }
@@ -659,6 +660,23 @@ api_lab() {
 
 status_http() { cat "$TEMP_EV/status"; }
 
+# Antes de falar com a API: a 443 responde? Se não, diz se é o IP de quem roda que mudou.
+conferir_acesso() {
+	local codigo atual lista
+	codigo="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "https://$1/health/ready" 2>/dev/null || true)"
+	[[ "$codigo" != 200 ]] || return 0
+	atual="$(curl -fsS -m 10 https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]' || true)"
+	lista="$(grupo_do_lab | jq -r '[.IpPermissions[]? | select(.FromPort == 443) | .IpRanges[].CidrIp] | join(" ")')"
+	falha "o laboratório não respondeu na 443 (HTTP ${codigo:-000})"
+	if [[ -n "$atual" && " $lista " != *" $atual/32 "* ]]; then
+		nota "O seu IP agora é $atual, e a 443 só abre para: ${lista:-ninguém}."
+		nota "Rode 'lab.sh liberar-ip' (ou SGS_LAB_IPS=<IPs da equipe> lab.sh liberar-ip) e tente de novo."
+	else
+		nota "Veja 'lab.sh estado': a instância pode estar parada ou ainda subindo."
+	fi
+	return 1
+}
+
 # URL de objeto do S3 da AWS, no endereço global (bucket.s3.amazonaws.com) ou no regional.
 url_e_da_aws() { [[ "$1" =~ ^https://[a-z0-9.-]+\.s3(\.[a-z0-9-]+)?\.amazonaws\.com/ ]]; }
 
@@ -796,6 +814,7 @@ evidencia() {
 		nota "Grave só a senha (linha 'admin:') nesse arquivo, com permissão 0600."
 		return 1
 	fi
+	conferir_acesso "$HOST_EV" || return 1
 	senha_admin="$(head -n1 "$arquivo_senha")"
 	local -a falhas=()
 	confere() { # descrição, condição jq, json
@@ -988,6 +1007,121 @@ evidencia() {
 	return 1
 }
 
+# --- relatorio ------------------------------------------------------------------------------------
+# Para a demonstração: um relatório, passo a passo, com o que mostrar no console da AWS. Entra como
+# ldap.gestor.dados (LDAP + 2FA), que recebe GESTOR_DADOS pelo mapeamento que a `evidencia` cria.
+# Mostra o link pré-assinado na tela, porque é para clicar: vale 5 minutos e só para este arquivo.
+
+link_do_console() { # bucket, chave
+	printf 'https://%s.console.aws.amazon.com/s3/object/%s?region=%s&bucketType=general&prefix=%s' \
+		"$REGIAO" "$1" "$REGIAO" "$(jq -rn --arg k "$2" '$k | @uri')"
+}
+
+hex_para_base64() { python3 -I -c 'import base64, sys; print(base64.b64encode(bytes.fromhex(sys.argv[1])).decode())' "$1"; }
+
+relatorio() {
+	local formato="${1:-csv}"
+	if [[ "$formato" != "csv" && "$formato" != "xlsx" ]]; then
+		falha "formato '$formato': use csv ou xlsx"
+		return 1
+	fi
+	precisa aws jq curl python3
+	exigir_credenciais
+	local temp
+	temp="$(mktemp -d)"
+	# shellcheck disable=SC2064 # o caminho da pasta é fixado agora, de propósito
+	trap "rm -rf '$temp'" EXIT
+	TEMP_EV="$temp"
+	JARRO="$temp/jarro"
+
+	local ip bucket
+	ip="$(ip_do_lab)"
+	bucket="$(bucket_do_lab)"
+	if [[ -z "$ip" || -z "$bucket" ]]; then
+		falha "o laboratório não está no ar (use 'lab.sh subir' e 'lab.sh estado')"
+		return 1
+	fi
+	HOST_EV="$(host_do_ip "$(jq -r .PublicIp <<<"$ip")")"
+	conferir_acesso "$HOST_EV" || return 1
+	printf '\nRelatório no bucket real, passo a passo (%s)\n\n' "$(date '+%d/%m/%Y %H:%M:%S')"
+
+	# 1. Quem pede: um usuário do diretório, com 2FA, e o papel que veio do grupo mapeado.
+	local token autorizacao me
+	token="$(entrar ldap.gestor.dados "$SENHA_DE_EXEMPLO_DO_LAB" ldap)" || true
+	if [[ -z "$token" || "$token" == "null" ]]; then
+		falha "login de ldap.gestor.dados (LDAP + 2FA)"
+		nota "Rode 'lab.sh evidencia' uma vez: ela cadastra o 2FA e mapeia o grupo para GESTOR_DADOS."
+		return 1
+	fi
+	autorizacao="$(cabecalho_de gestor "$token")"
+	me="$(api_lab GET /me "" "$autorizacao")"
+	if ! jq -e '[.papeis[]? | select(.papel == "GESTOR_DADOS")] | length > 0' <<<"$me" >/dev/null; then
+		falha "ldap.gestor.dados entrou, mas sem GESTOR_DADOS: rode 'lab.sh evidencia' (cria o mapeamento)"
+		return 1
+	fi
+	ok "1. login de ldap.gestor.dados por LDAP com 2FA: papel GESTOR_DADOS (do grupo sgs-gestor-dados)"
+
+	# 2. O pedido e a geração em segundo plano.
+	local pedido corpo status anterior="" tentativa
+	pedido="$(api_lab POST /relatorios "$(jq -cn --arg f "$formato" '{tipo: "inventario_unidades", formato: $f}')" \
+		"$autorizacao" | jq -r '.id // empty')"
+	if [[ "$(status_http)" != 202 || -z "$pedido" ]]; then
+		falha "2. pedido do relatório: HTTP $(status_http)"
+		return 1
+	fi
+	ok "2. pedido $pedido aceito (HTTP 202): inventário de unidades em $formato"
+	for tentativa in $(seq 1 "${SGS_LAB_TENTATIVAS:-40}"); do
+		corpo="$(api_lab GET "/relatorios/$pedido" "" "$autorizacao")"
+		status="$(jq -r '.status // "?"' <<<"$corpo")"
+		if [[ "$status" != "$anterior" ]]; then
+			nota "$(date +%H:%M:%S)  status: $status"
+			anterior="$status"
+		fi
+		[[ "$status" == "pendente" || "$status" == "gerando" ]] || break
+		((tentativa == ${SGS_LAB_TENTATIVAS:-40})) || sleep "${SGS_LAB_ESPERA:-2}"
+	done
+	if [[ "$status" != "concluido" ]]; then
+		falha "o relatório terminou como '$status': $(jq -r '.erro // "sem detalhe"' <<<"$corpo")"
+		return 1
+	fi
+	local sha_hex
+	sha_hex="$(jq -r .integridade.sha256 <<<"$corpo")"
+	ok "3. gerado e enviado ao S3: $(jq -r .tamanho_bytes <<<"$corpo") bytes, assinado em $(jq -r .integridade.algoritmo <<<"$corpo") (kid $(jq -r .integridade.kid <<<"$corpo"))"
+	nota "SHA-256 (hex, como a API guarda):       $sha_hex"
+	nota "SHA-256 (base64, como o console do S3): $(hex_para_base64 "$sha_hex")"
+
+	# 4. O objeto, lido do S3 de fora da API, e onde vê-lo no console.
+	local link url chave objeto
+	link="$(api_lab GET "/relatorios/$pedido/download" "" "$autorizacao")"
+	url="$(jq -r '.url // empty' <<<"$link")"
+	if ! url_e_da_aws "$url"; then
+		falha "a API não devolveu uma URL do S3 da AWS"
+		return 1
+	fi
+	chave="$(python3 -I -c 'import sys, urllib.parse as u; print(u.unquote(u.urlsplit(sys.argv[1]).path.lstrip("/")))' "$url")"
+	objeto="$(aws_ s3api head-object --bucket "$bucket" --key "$chave" --checksum-mode ENABLED)"
+	ok "4. objeto no bucket: s3://$bucket/$chave"
+	nota "criptografia: $(jq -r .ServerSideEncryption <<<"$objeto"), chave $(jq -r '.SSEKMSKeyId | sub(".*:key/"; "key/")' <<<"$objeto")"
+	nota "checksum SHA-256 no S3: $(jq -r '.ChecksumSHA256 // "-"' <<<"$objeto"); versão $(jq -r .VersionId <<<"$objeto")"
+	nota "gravado em: $(jq -r .LastModified <<<"$objeto")"
+	nota "no console: $(link_do_console "$bucket" "$chave")"
+
+	# 5. O download pela URL pré-assinada, conferido aqui.
+	local baixado
+	baixado="$(curl -sS -o "$temp/relatorio" -w '%{http_code}' "$url" || echo 000)"
+	if [[ "$baixado" == 200 && "$(sha256sum "$temp/relatorio" | cut -d' ' -f1)" == "$sha_hex" ]]; then
+		ok "5. baixado pela URL pré-assinada (HTTP 200): o SHA-256 do arquivo confere com o da API"
+	else
+		falha "5. download pela URL pré-assinada: HTTP $baixado, ou SHA-256 diferente"
+		return 1
+	fi
+	echo
+	nota "Link para abrir no navegador (vale até $(jq -r .expira_em <<<"$link"); é uma credencial de 5 minutos,"
+	nota "só para este arquivo: não cole em chat nem em documento):"
+	printf '\n%s\n\n' "$url"
+	nota "Sem a assinatura, o mesmo endereço é recusado: ${url%%\?*}"
+}
+
 # --- entrada --------------------------------------------------------------------------------------
 
 principal() {
@@ -1001,6 +1135,7 @@ principal() {
 	parar) parar ;;
 	ligar) ligar ;;
 	evidencia) evidencia ;;
+	relatorio) relatorio "$@" ;;
 	destruir) destruir "$@" ;;
 	*)
 		uso

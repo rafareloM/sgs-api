@@ -130,6 +130,30 @@ O que ela confere, nesta ordem:
 
 O 2FA de cada usuário cadastrado pela evidência fica em `~/.config/sgs-lab/<usuário>.totp` (0600), para as execuções seguintes. Para entrar na tela com esses usuários, use a mesma URI num app autenticador.
 
+## 7. Demonstrar um relatório no bucket
+Para mostrar, ao vivo, um relatório indo para o S3: rode, depois da evidência (ela cria o mapeamento e o 2FA do gestor):
+
+```bash
+docker/aws/lab.sh relatorio          # inventário em CSV; 'lab.sh relatorio xlsx' para planilha
+```
+
+Cada etapa aparece numa linha:
+1. o login de `ldap.gestor.dados` por LDAP com 2FA, com o papel `GESTOR_DADOS`;
+2. o pedido e cada mudança de status (`pendente`, `gerando`, `concluido`);
+3. o tamanho, a assinatura e o SHA-256, em hex (como a API guarda) e em base64 (como o console do S3 mostra);
+4. o objeto no bucket, lido de fora da API (criptografia `aws:kms`, chave, checksum, versão, hora da gravação), com o link direto para ele no console da AWS;
+5. o download pela URL pré-assinada, com o SHA-256 conferido.
+
+No fim vem o link pré-assinado, para abrir no navegador, e o mesmo endereço sem a assinatura, que o S3 recusa. O link vale 5 minutos e só para aquele arquivo: mostre na tela, mas não cole em chat nem em documento.
+
+No console da AWS, abra o link do passo 4 e mostre:
+- **Propriedades:** criptografia `aws:kms`, a hora da gravação e o checksum, igual ao base64 do passo 3;
+- **Versões:** uma por envio.
+
+Em CloudTrail → Histórico de eventos, filtre `AssumeRole` e mostre a sessão `sgs-<id>` daquele minuto: a API pegou credenciais de 15 minutos para o envio.
+
+**Se a sua rede troca de IP:** algumas conexões (4G, CGNAT, VPN) mudam o IP público a cada tanto, e a 443 deixa de responder. O `relatorio` e a `evidencia` conferem a 443 antes de começar e dizem qual é o seu IP agora. Rode `lab.sh liberar-ip` logo antes de apresentar e tenha o comando à mão.
+
 ## O que muda em relação ao compose local
 | Peça | Local | AWS |
 |---|---|---|
