@@ -27,6 +27,12 @@ PROD: dict[str, object] = {
         "postgresql+asyncpg://sgs_api:Kx9-segredo-de-verdade@db.interno:5432/sgs"
     ),
     "database_ssl_mode": DatabaseSslMode.VERIFY_FULL,
+    # Sem o S3 por papel, ExternalId e chave KMS, a API não sobe em prod (005/R2.9, T4).
+    "s3_bucket": "sgs-relatorios",
+    "s3_assume_role_arn": "arn:aws:iam::123456789012:role/sgs-relatorios",
+    "s3_external_id": "sgs-relatorios-7f3a9c",
+    "s3_kms_key_id": "arn:aws:kms:sa-east-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+    "s3_sse": "aws:kms",
 }
 
 

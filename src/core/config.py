@@ -59,6 +59,14 @@ OIDC_CALLBACK_PATH = "/api/v1/auth/oidc/callback"
 # Nomes de atributo LDAP: entram nos filtros e na lista de atributos pedidos (004, design).
 LDAP_ATTRIBUTE = re.compile(r"[A-Za-z][A-Za-z0-9-]{0,63}")
 LDAP_PAGE_SIZE_MAX = 1000
+# Chave KMS como ARN de chave, nunca alias nem id solto: a resposta do PutObject traz o ARN, e a
+# conferência da gravação é exata (005, D005-5). Vale para as partições da AWS e para as chaves
+# multirregião (`mrk-`); o id vem em minúsculas, como a AWS o devolve. A conta é `[0-9]`, não `\d`,
+# que aceitaria dígitos Unicode.
+KMS_KEY_ARN = re.compile(
+    r"arn:aws(?:-[a-z]+)*:kms:[a-z0-9-]+:[0-9]{12}:key/"
+    r"(?:mrk-[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+)
 
 
 class SettingsError(Exception):
@@ -116,6 +124,63 @@ class Settings(BaseSettings):
     # `chaves_de_relatorio`.
     report_signing_keys: Annotated[tuple[JwtSigningKey, ...], NoDecode] = ()
     report_signing_keys_file: Annotated[tuple[JwtSigningKey, ...], NoDecode] = ()
+
+    # S3 dos relatórios (005, design § Configuração). Sem S3_BUCKET, a exportação fica desligada
+    # fora de prod; em prod, o acesso é só pelo papel, com ExternalId e chave KMS (R2.9).
+    s3_bucket: str | None = None
+    s3_region: str | None = None
+    s3_endpoint_url: str | None = None
+    s3_public_endpoint_url: str | None = None  # padrão: S3_ENDPOINT_URL; use `s3_endpoint_publico`
+    s3_ca_file: FilePath | None = None
+    s3_addressing_style: Literal["virtual", "path"] = "virtual"
+    s3_assume_role_arn: str | None = None
+    s3_external_id: str | None = None
+    s3_kms_key_id: str | None = None
+    s3_sse: Literal["aws:kms", "AES256"] = "AES256"
+    # Chaves fixas do laboratório, só fora de prod (R2.2).
+    s3_access_key_id: SecretStr | None = None
+    s3_secret_access_key: SecretStr | None = None
+    # Variáveis do SDK da AWS, declaradas só para a recusa em prod: o boto3 as leria antes do papel.
+    aws_access_key_id: SecretStr | None = None
+    aws_secret_access_key: SecretStr | None = None
+    aws_session_token: SecretStr | None = None
+    aws_profile: str | None = None
+    aws_default_profile: str | None = None  # nome antigo do AWS_PROFILE, ainda lido pelo botocore
+    # Guarda dos relatórios no bucket, em dias (G1 da 005).
+    report_retention_days: int = Field(default=90, ge=1, le=3650)
+
+    @field_validator(
+        "s3_bucket",
+        "s3_region",
+        "s3_endpoint_url",
+        "s3_public_endpoint_url",
+        "s3_ca_file",
+        "s3_assume_role_arn",
+        "s3_external_id",
+        "s3_kms_key_id",
+        "s3_access_key_id",
+        "s3_secret_access_key",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "aws_profile",
+        "aws_default_profile",
+        mode="before",
+    )
+    @classmethod
+    def _s3_empty_is_unset(cls, value: object) -> object:
+        # `S3_ASSUME_ROLE_ARN=` num arquivo de ambiente (como no .env.example) não é um valor.
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @property
+    def exportacao_ligada(self) -> bool:
+        """A exportação de relatórios só funciona com S3_BUCKET; sem ele, as rotas dão 503."""
+        return self.s3_bucket is not None
+
+    @property
+    def s3_endpoint_publico(self) -> str | None:
+        """Endereço das URLs de download (005/R3.6): S3_PUBLIC_ENDPOINT_URL ou o interno."""
+        return self.s3_public_endpoint_url or self.s3_endpoint_url
 
     # Chaves do `FieldCipher` (spec 002, T5): objeto JSON {"<versão>": "<32 bytes em base64>"}
     # em CRYPTO_KEYS ou num arquivo montado (CRYPTO_KEYS_FILE); CRYPTO_ACTIVE_KEY diz qual cifra.
@@ -311,6 +376,7 @@ class Settings(BaseSettings):
                 "JWT_PRIVATE_KEYS_FILE: defina as chaves JWT só nela ou só em JWT_PRIVATE_KEYS"
             )
         problems.extend(self._report_signing_problems())
+        problems.extend(self._s3_problems())
         problems.extend(self._crypto_problems())
         problems.extend(self._oidc_problems())
         problems.extend(self._ldap_problems())
@@ -362,6 +428,64 @@ class Settings(BaseSettings):
             )
             if self.app_env is AppEnv.PROD and any(_is_example(key.kid) for key in keys):
                 problems.append(f"{name}: chave de exemplo não é aceita em prod")
+        return problems
+
+    def _s3_problems(self) -> list[str]:
+        """005/R2.2, R2.7 e R2.9 (design § Configuração). Os endereços valem sempre que definidos;
+        o S3 só é obrigatório em prod, onde vale apenas o papel, com ExternalId e chave KMS."""
+        urls = {
+            "S3_ENDPOINT_URL": self.s3_endpoint_url,
+            "S3_PUBLIC_ENDPOINT_URL": self.s3_public_endpoint_url,
+        }
+        problems = [
+            f"{name}: use um endereço https://"
+            for name, url in urls.items()
+            if url is not None and not is_https_url(url)
+        ]
+        if self.s3_kms_key_id is not None and not KMS_KEY_ARN.fullmatch(self.s3_kms_key_id):
+            # Opcional fora de prod, mas, se vier, como ARN: senão nenhuma gravação confere.
+            problems.append(
+                "S3_KMS_KEY_ID: use o ARN da chave (arn:aws:kms:<região>:<conta>:key/<id>)"
+            )
+        if (self.s3_access_key_id is None) != (self.s3_secret_access_key is None):
+            problems.append(
+                "S3_SECRET_ACCESS_KEY: defina junto com S3_ACCESS_KEY_ID (as duas ou nenhuma)"
+            )
+        if self.exportacao_ligada and not self.chaves_de_relatorio:
+            # Todo relatório exportado sai assinado (R5.1).
+            problems.append(
+                "REPORT_SIGNING_KEYS: obrigatória com S3_BUCKET (ou REPORT_SIGNING_KEYS_FILE)"
+            )
+        if self.app_env is AppEnv.PROD:
+            problems.extend(self._s3_production_problems())
+        return problems
+
+    def _s3_production_problems(self) -> list[str]:
+        """R2.9: sem papel, ExternalId, chave KMS ou `aws:kms`, ou com chave fixa, a API não sobe em
+        prod (R2.1 a R2.3). O formato da chave KMS é conferido em `_s3_problems`."""
+        required = {
+            "S3_BUCKET": self.s3_bucket,
+            "S3_ASSUME_ROLE_ARN": self.s3_assume_role_arn,
+            "S3_EXTERNAL_ID": self.s3_external_id,
+            "S3_KMS_KEY_ID": self.s3_kms_key_id,
+        }
+        problems = [f"{name}: obrigatória em prod" for name, v in required.items() if v is None]
+        if self.s3_sse != "aws:kms":
+            problems.append("S3_SSE: prod exige aws:kms")
+        static_keys = {
+            "S3_ACCESS_KEY_ID": self.s3_access_key_id,
+            "S3_SECRET_ACCESS_KEY": self.s3_secret_access_key,
+            "AWS_ACCESS_KEY_ID": self.aws_access_key_id,
+            "AWS_SECRET_ACCESS_KEY": self.aws_secret_access_key,
+            "AWS_SESSION_TOKEN": self.aws_session_token,
+            "AWS_PROFILE": self.aws_profile,
+            "AWS_DEFAULT_PROFILE": self.aws_default_profile,
+        }
+        problems.extend(
+            f"{name}: chave fixa não é aceita em prod; o acesso é pelo papel de S3_ASSUME_ROLE_ARN"
+            for name, value in static_keys.items()
+            if value is not None
+        )
         return problems
 
     def _oidc_problems(self) -> list[str]:

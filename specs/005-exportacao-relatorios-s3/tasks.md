@@ -112,7 +112,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R2.1, R2.3, R2.4, R2.7, R2.8, R3.2, R3.6
   - Pronto quando: `tests/unit/reports/test_conferencia.py` e `tests/integration/reports/test_s3_adapter.py` (`moto`) passam
-- [ ] T4. Configuração S3 e recusas em `prod`
+- [x] T4. Configuração S3 e recusas em `prod`
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/core/test_config.py::test_prod_recusa_iniciar_sem_bucket_papel_external_id_ou_chave_kms`, `::test_prod_recusa_iniciar_com_chave_fixa`, `::test_s3_recusa_endereco_sem_https`, `::test_exportacao_fica_desligada_sem_s3_bucket`
   - Frente: C
   - Faz: campos `S3_*` e `REPORT_RETENTION_DAYS` em `Settings` (`_s3_problems`):
     - só `https://`;

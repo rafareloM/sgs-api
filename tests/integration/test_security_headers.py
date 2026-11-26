@@ -7,7 +7,7 @@ from pydantic import SecretStr
 
 from src.core.config import AppEnv, DatabaseSslMode
 from src.main import create_app
-from tests.factories import URL_SEM_BANCO, make_settings
+from tests.factories import URL_SEM_BANCO, make_jwt_private_keys, make_settings
 
 ORIGEM_DO_FRONT = "https://app.sgs.localhost"
 
@@ -29,6 +29,13 @@ def _app_de_producao() -> FastAPI:
             app_env=AppEnv.PROD,
             database_url=SecretStr("postgresql+asyncpg://sgs_api:Kx9-segredo@db.interno:5432/sgs"),
             database_ssl_mode=DatabaseSslMode.VERIFY_FULL,
+            # Sem o S3 por papel, ExternalId e chave KMS, a API não sobe em prod (005/R2.9).
+            s3_bucket="sgs-relatorios",
+            s3_assume_role_arn="arn:aws:iam::123456789012:role/sgs-relatorios",
+            s3_external_id="sgs-relatorios-7f3a9c",
+            s3_kms_key_id="arn:aws:kms:sa-east-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+            s3_sse="aws:kms",
+            report_signing_keys=make_jwt_private_keys("rel-2026-11"),
         )
     )
 

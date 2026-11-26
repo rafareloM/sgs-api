@@ -37,6 +37,15 @@ VARIAVEIS_PROD = {
     "JWT_PRIVATE_KEYS": make_jwt_private_keys("2026-11"),
     "CRYPTO_KEYS": json.dumps({"2": base64.b64encode(bytes(range(1, 33))).decode()}),
     "CRYPTO_ACTIVE_KEY": "2",
+    # S3 de prod (005/R2.9): papel, ExternalId e chave KMS por ARN; com o bucket, a chave dos
+    # relatórios (design § Configuração).
+    "S3_BUCKET": "sgs-relatorios",
+    "S3_REGION": "sa-east-1",
+    "S3_ASSUME_ROLE_ARN": "arn:aws:iam::123456789012:role/sgs-relatorios",
+    "S3_EXTERNAL_ID": "sgs-relatorios-7f3a9c",
+    "S3_KMS_KEY_ID": "arn:aws:kms:sa-east-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+    "S3_SSE": "aws:kms",
+    "REPORT_SIGNING_KEYS": make_jwt_private_keys("rel-2026-11"),
 }
 
 
@@ -769,3 +778,276 @@ def test_senha_ldap_de_exemplo_vale_fora_de_prod(
 
     assert senha is not None
     assert senha.get_secret_value() == "sgs-lab-exemplo-bind"
+
+
+# S3 (spec 005, T4; design § Configuração). Sem S3_BUCKET, a exportação fica desligada; em prod,
+# o S3 é obrigatório e só por papel, ExternalId e chave KMS (R2.9).
+VARIAVEIS_S3_LAB = {
+    "S3_BUCKET": "sgs-relatorios",
+    "S3_REGION": "us-east-1",
+    "S3_ENDPOINT_URL": "https://s3:8333",
+    "S3_PUBLIC_ENDPOINT_URL": "https://s3.localhost",
+    "S3_ADDRESSING_STYLE": "path",
+    "S3_SSE": "AES256",
+    "S3_ACCESS_KEY_ID": "sgs-lab-exemplo",
+    "S3_SECRET_ACCESS_KEY": "sgs-lab-exemplo-s3",
+    "REPORT_SIGNING_KEYS": make_jwt_private_keys("rel-lab"),
+}
+CHAVES_FIXAS = (
+    "S3_ACCESS_KEY_ID",
+    "S3_SECRET_ACCESS_KEY",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_PROFILE",
+    "AWS_DEFAULT_PROFILE",  # nome antigo do AWS_PROFILE, que o botocore ainda lê
+)
+
+
+def test_exportacao_fica_desligada_sem_s3_bucket(ambiente: DefinirAmbiente) -> None:
+    """005/R2.9 (design § Configuração: sem S3_BUCKET, a exportação fica desligada em dev e test;
+    a guarda dos relatórios é de 90 dias)"""
+    ambiente(VARIAVEIS_DEV)
+
+    settings = load_settings()
+
+    assert settings.exportacao_ligada is False
+    assert settings.s3_bucket is None
+    assert settings.report_retention_days == 90
+
+
+def test_s3_do_laboratorio_e_aceito_fora_de_prod(ambiente: DefinirAmbiente) -> None:
+    """005/R2.2, 005/R2.7 (fora de prod, as chaves fixas do laboratório valem; tudo por https)"""
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, "AWS_PROFILE": "laboratorio"})
+
+    settings = load_settings()
+
+    assert settings.exportacao_ligada is True
+    assert settings.s3_bucket == "sgs-relatorios"
+    assert settings.s3_region == "us-east-1"
+    assert settings.s3_endpoint_url == "https://s3:8333"
+    assert settings.s3_endpoint_publico == "https://s3.localhost"
+    assert settings.s3_addressing_style == "path"
+    assert settings.s3_sse == "AES256"
+    assert settings.s3_access_key_id is not None
+    assert settings.s3_access_key_id.get_secret_value() == "sgs-lab-exemplo"
+    assert settings.s3_secret_access_key is not None
+    assert settings.s3_secret_access_key.get_secret_value() == "sgs-lab-exemplo-s3"
+    assert settings.s3_assume_role_arn is None
+    assert settings.s3_kms_key_id is None
+
+
+def test_s3_endpoint_publico_usa_o_interno_por_padrao(ambiente: DefinirAmbiente) -> None:
+    """005/R3.6 (design § Configuração: S3_PUBLIC_ENDPOINT_URL tem como padrão o S3_ENDPOINT_URL)"""
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, "S3_PUBLIC_ENDPOINT_URL": ""})
+    assert load_settings().s3_endpoint_publico == "https://s3:8333"
+
+    ambiente({"S3_ENDPOINT_URL": ""})
+    settings = load_settings()
+    assert settings.s3_endpoint_url is None
+    assert settings.s3_endpoint_publico is None  # AWS real: o endereço padrão do SDK
+
+
+@pytest.mark.parametrize(
+    ("variavel", "valor"),
+    [
+        ("S3_ENDPOINT_URL", "http://s3:8333"),
+        ("S3_ENDPOINT_URL", "s3:8333"),
+        ("S3_ENDPOINT_URL", "https://sgs:segredo@s3:8333"),
+        ("S3_PUBLIC_ENDPOINT_URL", "http://s3.localhost"),
+    ],
+)
+def test_s3_recusa_endereco_sem_https(ambiente: DefinirAmbiente, variavel: str, valor: str) -> None:
+    """005/R2.7"""
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, variavel: valor})
+
+    with pytest.raises(SettingsError, match=f"{variavel}: use um endereço https://"):
+        load_settings()
+
+
+def test_s3_recusa_http_mesmo_com_a_exportacao_desligada(ambiente: DefinirAmbiente) -> None:
+    """005/R2.7 (o endereço é conferido sempre que definido, como o http:// do .env.example)"""
+    ambiente({**VARIAVEIS_DEV, "S3_ENDPOINT_URL": "http://s3:8333"})
+
+    with pytest.raises(SettingsError, match="S3_ENDPOINT_URL: use um endereço https://"):
+        load_settings()
+
+
+def test_s3_ca_file_precisa_existir(ambiente: DefinirAmbiente, tmp_path: Path) -> None:
+    """005/R2.7 (design § Configuração: a CA que confere o certificado do S3 é um arquivo)"""
+    ca = tmp_path / "ca.crt"
+    ca.write_text("-----BEGIN CERTIFICATE-----\n", encoding="utf-8")
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, "S3_CA_FILE": str(ca)})
+    assert load_settings().s3_ca_file == ca
+
+    ambiente({"S3_CA_FILE": str(tmp_path / "nao-existe.crt")})
+    with pytest.raises(SettingsError, match="S3_CA_FILE: arquivo não encontrado"):
+        load_settings()
+
+
+@pytest.mark.parametrize(
+    ("variavel", "valor"),
+    [
+        ("S3_SSE", "aws:kms:dsse"),
+        ("S3_SSE", "aes256"),
+        ("S3_ADDRESSING_STYLE", "auto"),
+        ("REPORT_RETENTION_DAYS", "0"),
+        ("REPORT_RETENTION_DAYS", "3651"),
+    ],
+)
+def test_s3_recusa_valor_fora_das_opcoes(
+    ambiente: DefinirAmbiente, variavel: str, valor: str
+) -> None:
+    """005/R2.9 (design § Configuração: S3_SSE é aws:kms ou AES256; S3_ADDRESSING_STYLE, virtual
+    ou path; REPORT_RETENTION_DAYS, de 1 a 3650)"""
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, variavel: valor})
+
+    with pytest.raises(SettingsError, match=variavel):
+        load_settings()
+
+
+def test_s3_bucket_exige_as_chaves_de_relatorio(ambiente: DefinirAmbiente) -> None:
+    """005/R5.1 (design § Configuração: REPORT_SIGNING_KEYS é obrigatória com S3_BUCKET; todo
+    relatório exportado sai assinado)"""
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, "REPORT_SIGNING_KEYS": ""})
+
+    with pytest.raises(SettingsError, match="REPORT_SIGNING_KEYS: obrigatória com S3_BUCKET"):
+        load_settings()
+
+
+def test_s3_chaves_do_laboratorio_vao_em_par(ambiente: DefinirAmbiente) -> None:
+    """005/R2.2 (design § Adaptador S3: fora de prod, sem papel, o par de chaves do laboratório)"""
+    ambiente({**VARIAVEIS_DEV, **VARIAVEIS_S3_LAB, "S3_SECRET_ACCESS_KEY": ""})
+
+    with pytest.raises(SettingsError, match="S3_SECRET_ACCESS_KEY: defina junto com"):
+        load_settings()
+
+
+def test_variaveis_s3_vazias_valem_como_nao_definidas(ambiente: DefinirAmbiente) -> None:
+    """005/R2.9 (`S3_ASSUME_ROLE_ARN=` num arquivo de ambiente, como no .env.example, não é um
+    valor; `S3_BUCKET=` desliga a exportação)"""
+    opcionais = (
+        "S3_BUCKET",
+        "S3_REGION",
+        "S3_ENDPOINT_URL",
+        "S3_PUBLIC_ENDPOINT_URL",
+        "S3_CA_FILE",
+        "S3_ASSUME_ROLE_ARN",
+        "S3_EXTERNAL_ID",
+        "S3_KMS_KEY_ID",
+        *CHAVES_FIXAS,
+    )
+    ambiente({**VARIAVEIS_DEV, **dict.fromkeys(opcionais, "")})
+
+    settings = load_settings()
+
+    assert settings.exportacao_ligada is False
+    assert settings.s3_assume_role_arn is None
+    assert settings.aws_profile is None
+
+
+def test_prod_com_s3_por_papel_e_kms_inicia(ambiente: DefinirAmbiente) -> None:
+    """005/R2.9"""
+    ambiente(VARIAVEIS_PROD)
+
+    settings = load_settings()
+
+    assert settings.exportacao_ligada is True
+    assert settings.s3_sse == "aws:kms"
+    assert settings.s3_assume_role_arn == VARIAVEIS_PROD["S3_ASSUME_ROLE_ARN"]
+    assert settings.s3_external_id == VARIAVEIS_PROD["S3_EXTERNAL_ID"]
+    assert settings.s3_kms_key_id == VARIAVEIS_PROD["S3_KMS_KEY_ID"]
+
+
+@pytest.mark.parametrize(
+    "variavel", ["S3_BUCKET", "S3_ASSUME_ROLE_ARN", "S3_EXTERNAL_ID", "S3_KMS_KEY_ID"]
+)
+def test_prod_recusa_iniciar_sem_bucket_papel_external_id_ou_chave_kms(
+    ambiente: DefinirAmbiente, variavel: str
+) -> None:
+    """005/R2.9"""
+    ambiente({nome: valor for nome, valor in VARIAVEIS_PROD.items() if nome != variavel})
+
+    with pytest.raises(SettingsError, match=f"{variavel}: obrigatória em prod"):
+        load_settings()
+
+
+@pytest.mark.parametrize(
+    "valor",
+    [
+        "alias/sgs-relatorios",
+        "1234abcd-12ab-34cd-56ef-1234567890ab",
+        "arn:aws:kms:sa-east-1:123456789012:alias/sgs-relatorios",
+        "arn:aws:kms:sa-east-1:1234:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        # Dígitos Unicode (de largura total, U+FF10 a U+FF19): a AWS devolve a conta só em 0-9.
+        "arn:aws:kms:sa-east-1:"
+        + "".join(chr(0xFF10 + int(d)) for d in "123456789012")
+        + ":key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        # A AWS devolve o id em minúsculas; em maiúsculas, a conferência exata da R2.8 falharia.
+        "arn:aws:kms:sa-east-1:123456789012:key/1234ABCD-12AB-34CD-56EF-1234567890AB",
+    ],
+    ids=["alias", "id", "arn_de_alias", "conta_invalida", "conta_unicode", "maiusculas"],
+)
+@pytest.mark.parametrize("variaveis", [VARIAVEIS_PROD, VARIAVEIS_S3_LAB], ids=["prod", "dev"])
+def test_recusa_chave_kms_que_nao_e_arn_de_chave(
+    ambiente: DefinirAmbiente, valor: str, variaveis: dict[str, str]
+) -> None:
+    """005/R2.9 (D005-5: a resposta do PutObject traz o ARN, e a conferência da R2.8 é exata;
+    fora de prod, a chave é opcional, mas, se vier, vem como ARN)"""
+    ambiente({**VARIAVEIS_DEV, **variaveis, "S3_SSE": "aws:kms", "S3_KMS_KEY_ID": valor})
+
+    with pytest.raises(SettingsError, match="S3_KMS_KEY_ID: use o ARN da chave"):
+        load_settings()
+
+
+@pytest.mark.parametrize(
+    "valor",
+    [
+        "arn:aws-us-gov:kms:us-gov-west-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+        "arn:aws:kms:sa-east-1:123456789012:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+    ],
+    ids=["outra_particao", "multirregiao"],
+)
+def test_prod_aceita_arn_de_chave_kms_de_outra_particao_ou_multirregiao(
+    ambiente: DefinirAmbiente, valor: str
+) -> None:
+    """005/R2.9"""
+    ambiente({**VARIAVEIS_PROD, "S3_KMS_KEY_ID": valor})
+
+    assert load_settings().s3_kms_key_id == valor
+
+
+def test_prod_exige_sse_aws_kms(ambiente: DefinirAmbiente) -> None:
+    """005/R2.9 (design § Configuração: prod exige aws:kms)"""
+    ambiente({**VARIAVEIS_PROD, "S3_SSE": "AES256"})
+
+    with pytest.raises(SettingsError, match="S3_SSE: prod exige aws:kms"):
+        load_settings()
+
+
+@pytest.mark.parametrize("variavel", CHAVES_FIXAS)
+def test_prod_recusa_iniciar_com_chave_fixa(ambiente: DefinirAmbiente, variavel: str) -> None:
+    """005/R2.2, 005/R2.9 (as variáveis do SDK também: o boto3 as leria antes do papel)"""
+    ambiente({**VARIAVEIS_PROD, variavel: "AKIAIOSFODNN7EXAMPLE"})
+
+    with pytest.raises(SettingsError, match=f"{variavel}: chave fixa não é aceita em prod"):
+        load_settings()
+
+
+def test_erro_de_configuracao_s3_nao_expoe_o_valor_recebido(ambiente: DefinirAmbiente) -> None:
+    """005/R2.2 (steering/security.md: nenhum segredo em exceção)"""
+    segredo = "wJalrXUtnFEMI-K7MDENG-bPxRfiCY"
+    ambiente(
+        {
+            **VARIAVEIS_PROD,
+            "AWS_SECRET_ACCESS_KEY": segredo,
+            "S3_SECRET_ACCESS_KEY": segredo,
+            "S3_ENDPOINT_URL": f"http://sgs:{segredo}@s3:8333",
+        }
+    )
+
+    with pytest.raises(SettingsError) as erro:
+        load_settings()
+
+    assert "AWS_SECRET_ACCESS_KEY" in str(erro.value)
+    assert segredo not in str(erro.value)
