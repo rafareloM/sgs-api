@@ -1116,9 +1116,12 @@ relatorio() {
 		return 1
 	fi
 	echo
-	nota "Link para abrir no navegador (vale até $(jq -r .expira_em <<<"$link"); é uma credencial de 5 minutos,"
-	nota "só para este arquivo: não cole em chat nem em documento):"
-	printf '\n%s\n\n' "$url"
+	# O link carrega o token da sessão do AssumeRole (15 min): abre no navegador, nunca vai para a tela.
+	if xdg-open "$url" >/dev/null 2>&1; then
+		ok "6. link pré-assinado aberto no navegador (vale até $(jq -r .expira_em <<<"$link"))"
+	else
+		falha "6. não consegui abrir o navegador (xdg-open); o link não é mostrado porque é uma credencial"
+	fi
 	nota "Sem a assinatura, o mesmo endereço é recusado: ${url%%\?*}"
 }
 

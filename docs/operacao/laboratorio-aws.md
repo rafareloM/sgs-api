@@ -144,7 +144,7 @@ Cada etapa aparece numa linha:
 4. o objeto no bucket, lido de fora da API (criptografia `aws:kms`, chave, checksum, versão, hora da gravação), com o link direto para ele no console da AWS;
 5. o download pela URL pré-assinada, com o SHA-256 conferido.
 
-No fim vem o link pré-assinado, para abrir no navegador, e o mesmo endereço sem a assinatura, que o S3 recusa. O link vale 5 minutos e só para aquele arquivo: mostre na tela, mas não cole em chat nem em documento.
+No fim, o link pré-assinado abre direto no navegador (`xdg-open`) e não aparece no terminal: além da assinatura, ele carrega o token da sessão do `AssumeRole`, que vale 15 minutos. O terminal mostra só o mesmo endereço sem a assinatura, que o S3 recusa.
 
 No console da AWS, abra o link do passo 4 e mostre:
 - **Propriedades:** criptografia `aws:kms`, a hora da gravação e o checksum, igual ao base64 do passo 3;
