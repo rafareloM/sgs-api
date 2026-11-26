@@ -81,7 +81,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R1.1, R2.5, R5.1
   - Pronto quando: `tests/integration/reports/test_report_jobs.py` passa
-- [ ] T2. Geradores CSV e XLSX
+- [x] T2. Geradores CSV e XLSX
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_generators.py::test_xlsx_nenhuma_celula_e_formula_e_texto_perigoso_ganha_aspa`, `::test_csv_utf8_com_bom_ponto_e_virgula_e_crlf` e `::test_sha256_e_tamanho_calculados_durante_a_escrita_conferem_com_o_arquivo` (arquivo inteiro passa)
   - Frente: C
   - Faz:
     - CSV: UTF-8 com BOM, `;` e `\r\n`;
