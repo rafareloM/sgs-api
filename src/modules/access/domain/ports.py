@@ -68,6 +68,10 @@ class RepositorioDeAtribuicoes(Protocol):
 class RepositorioDeMapeamentos(Protocol):
     """Mapeamentos grupo→papel (R3) e as atribuições derivadas deles."""
 
+    async def grupo_existe(self, grupo_id: UUID) -> bool:
+        """Se o grupo está em `groups` (spec 004), ativo ou não (FK do mapeamento)."""
+        ...
+
     async def ha_mapeamento(
         self, grupo_id: UUID, papel: str, escopo_tipo: str, escopo_id: str | None
     ) -> bool:

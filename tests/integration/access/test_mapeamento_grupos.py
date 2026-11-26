@@ -371,3 +371,20 @@ async def test_rotas_exigem_token_e_papel_assign(
     gestor = bearer(app, await logado(sessoes, ("GESTOR_DADOS", GLOBAL)))
     sem_permissao = await cliente.request(metodo, caminho, json=corpo, headers=gestor)
     assert sem_permissao.status_code == 403
+
+
+async def test_grupo_inexistente_responde_422_no_campo_sem_gravar(
+    app: FastAPI, cliente: httpx.AsyncClient, sessoes: Sessoes
+) -> None:
+    """003/R3.1, R2.1 (revisão da frente A, S2: antes, a FK recusava e a resposta era 500)"""
+    admin = await logado(sessoes, ("ADMIN_TI", GLOBAL))
+
+    resposta = await cliente.post(
+        ROTA, json=_corpo(uuid7(), "AUDITOR", "global", None), headers=bearer(app, admin)
+    )
+
+    assert resposta.status_code == 422, resposta.text
+    assert [e["campo"] for e in resposta.json()["errors"]] == ["grupo_id"]
+    async with sessoes() as sessao:
+        assert await sessao.scalar(text("SELECT count(*) FROM group_role_mappings")) == 0
+    assert await eventos(sessoes, "mapeamento.criado") == []

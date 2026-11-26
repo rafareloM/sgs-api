@@ -10,7 +10,7 @@ tocadas (R3.3).
 from collections.abc import Callable, Collection
 from uuid import UUID
 
-from src.core.errors import Conflict, DomainValidationError, NotFound
+from src.core.errors import Conflict, DomainValidationError, FieldError, NotFound
 from src.modules.access.application.atribuicoes import PERMISSAO, validar_escopo
 from src.modules.access.application.autorizacao import AcessoNegado, Recurso, UsuarioAtual
 from src.modules.access.domain.atribuicoes import Atribuicao
@@ -54,12 +54,15 @@ async def criar_mapeamento(
 ) -> MapeamentoDeGrupo:
     """Mapeia o grupo para o papel no escopo e atribui o papel a cada membro ativo (R3.1).
 
-    O escopo segue as regras da atribuição (R2.1, R2.2): `DomainValidationError` (422) se o papel
-    não existe, se o escopo não é o exigido por ele ou se não existe. `Conflict` (409) se o mesmo
-    mapeamento já existe. `AcessoNegado` (403) se quem mapeia é membro do grupo: ele atribuiria
-    papel a si mesmo (R2.5).
+    O escopo segue as regras da atribuição (R2.1, R2.2): `DomainValidationError` (422) se o grupo
+    ou o papel não existe, se o escopo não é o exigido por ele ou se não existe. `Conflict` (409)
+    se o mesmo mapeamento já existe. `AcessoNegado` (403) se quem mapeia é membro do grupo: ele
+    atribuiria papel a si mesmo (R2.5).
     """
     erros = await validar_escopo(papel, escopo_tipo, escopo_id, atribuicoes=atribuicoes)
+    if not await mapeamentos.grupo_existe(grupo_id):
+        # Revisão da frente A, S2: sem isto, a FK recusava e a resposta era 500.
+        erros = [*erros, FieldError(campo="grupo_id", mensagem="Grupo inexistente.")]
     if erros:
         raise DomainValidationError("A requisição tem campos inválidos.", errors=erros)
     if await mapeamentos.ha_mapeamento(grupo_id, papel, escopo_tipo, escopo_id):

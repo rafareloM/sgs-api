@@ -37,6 +37,7 @@ _users = table("users", column("id", Uuid), column("authz_version", Integer))
 # Tabelas do módulo identity (spec 004), só as colunas que a leitura dos membros usa.
 _users_ativos = table("users", column("id", Uuid), column("is_active", Boolean))
 _user_groups = table("user_groups", column("user_id", Uuid), column("group_id", Uuid))
+_groups = table("groups", column("id", Uuid))
 
 # Só o que liga a unidade aos escopos (spec 006, 0006): o distrito dela e a área técnica do seu
 # tipo. As tabelas completas são da infraestrutura do registry.
@@ -279,6 +280,9 @@ class SqlRepositorioDeMapeamentos:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def grupo_existe(self, grupo_id: UUID) -> bool:
+        return bool(await self._session.scalar(select(exists().where(_groups.c.id == grupo_id))))
 
     async def ha_mapeamento(
         self, grupo_id: UUID, papel: str, escopo_tipo: str, escopo_id: str | None
