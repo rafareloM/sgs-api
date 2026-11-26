@@ -5,6 +5,9 @@
 - A conta de serviço faz as buscas, paginadas e só com os atributos configurados (R1.3, R1.4).
 - Todo valor que entra em filtro passa por `escape_filter_chars` (R2.2).
 - A senha do usuário é conferida por bind com o DN dele; senha vazia nem chega ao bind (R2.4).
+- Referral nunca é seguido: seguir refaria o bind da conta de serviço no host indicado, em claro
+  se o referral for `ldap://` (R1.13). Busca que não termina em sucesso (referral, limite de
+  tamanho ou de tempo) é falha, nunca retrato parcial: a R1.7 desativaria quem ficou de fora.
 - O `ldap3` é síncrono: cada chamada roda em `anyio.to_thread.run_sync`.
 
 Erros do `ldap3` viram `DirectoryUnavailable` com mensagem genérica e sem a exceção original
@@ -27,9 +30,11 @@ from ldap3.core.exceptions import (
     LDAPCertificateError,
     LDAPException,
     LDAPInvalidCredentialsResult,
+    LDAPReferralError,
     LDAPSSLConfigurationError,
     LDAPStartTLSError,
 )
+from ldap3.core.results import RESULT_SUCCESS
 from ldap3.utils.conv import escape_filter_chars
 from pydantic import SecretStr
 
@@ -199,6 +204,8 @@ class Ldap3Directory:
             read_only=True,
             receive_timeout=RECEIVE_TIMEOUT_SECONDS,
             raise_exceptions=True,
+            # O padrão (True) refaz o bind, com esta senha, no host que o referral indicar.
+            auto_referrals=False,
         )
         try:
             conn.open()
@@ -225,6 +232,10 @@ class Ldap3Directory:
             paged_size=self._config.page_size,
             generator=False,
         )
+        # Referral (10) e os limites (3, 4) estão em DO_NOT_RAISE_EXCEPTIONS: sem esta
+        # conferência, a busca volta vazia ou cortada, sem erro (004/T2, revisão B1 e S1).
+        if (conn.result or {}).get("result") != RESULT_SUCCESS:
+            raise LDAPReferralError("busca não concluída")
         return [e for e in entries if e.get("type") == "searchResEntry"]
 
     @property
