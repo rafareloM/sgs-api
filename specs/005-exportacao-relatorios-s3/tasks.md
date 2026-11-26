@@ -103,7 +103,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T1
   - Requisitos: R1.3, R4.3
   - Pronto quando: `tests/integration/reports/test_consultas_relatorio.py` passa
-- [ ] T3. Armazenamento S3: porta, adaptador e conferência da gravação
+- [x] T3. Armazenamento S3: porta, adaptador e conferência da gravação
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_conferencia.py`, `tests/integration/reports/test_s3_adapter.py`
   - Frente: C
   - Faz:
     - `ArmazenamentoDeObjetos`, `ObjetoGravado` e `conferir_gravacao` no domínio;
