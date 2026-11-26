@@ -6,7 +6,7 @@ e a geração usa só ele (R1.3). Outra pessoa baixa o relatório se, na mesma p
 tiver um escopo que cubra o gravado (R3.3): `escopo_cobre`.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
@@ -63,3 +63,46 @@ def escopo_cobre(maior: Escopo, menor: Escopo) -> bool:
 
 def _vazio(escopo: Escopo) -> bool:
     return not (escopo.global_ or escopo.areas or escopo.distritos or escopo.unidades)
+
+
+def escopo_para_gravar(escopo: Escopo) -> dict[str, object]:
+    """O `scope_snapshot` do pedido, em JSON: `global_` vira `global`, os UUIDs viram texto."""
+    return {
+        "global": bool(escopo.global_),
+        "areas": sorted(int(area) for area in escopo.areas),
+        "distritos": sorted(int(distrito) for distrito in escopo.distritos),
+        "unidades": sorted(str(unidade) for unidade in escopo.unidades),
+    }
+
+
+def escopo_gravado(snapshot: Mapping[str, object]) -> EscopoGravado:
+    """O `scope_snapshot` lido de volta. Um snapshot fora do formato levanta `ValueError`, e o
+    pedido falha fechado, em vez de virar um escopo maior ou menor que o gravado."""
+    if set(snapshot) != {"global", "areas", "distritos", "unidades"}:
+        raise ValueError("escopo gravado fora do formato")
+    global_ = snapshot["global"]
+    areas, distritos, unidades = (
+        _lista(snapshot["areas"]),
+        _lista(snapshot["distritos"]),
+        _lista(snapshot["unidades"]),
+    )
+    if not isinstance(global_, bool) or not all(type(i) is int for i in (*areas, *distritos)):
+        raise ValueError("escopo gravado fora do formato")
+    if not all(isinstance(unidade, str) for unidade in unidades):
+        raise ValueError("escopo gravado fora do formato")
+    try:
+        ids_de_unidade = tuple(UUID(str(unidade)) for unidade in unidades)
+    except ValueError:
+        raise ValueError("escopo gravado fora do formato") from None
+    return EscopoGravado(
+        global_=global_,
+        areas=tuple(area for area in areas if isinstance(area, int)),
+        distritos=tuple(distrito for distrito in distritos if isinstance(distrito, int)),
+        unidades=ids_de_unidade,
+    )
+
+
+def _lista(valor: object) -> list[object]:
+    if not isinstance(valor, list):
+        raise ValueError("escopo gravado fora do formato")
+    return valor

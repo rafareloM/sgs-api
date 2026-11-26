@@ -1,12 +1,18 @@
 """Comparação de escopos para o download por outra pessoa (005/T12; design § Escopo dos
 relatórios, R3.3)."""
 
-from uuid import UUID
+import json
+from uuid import UUID, uuid4
 
 import pytest
 
 from src.modules.access.domain.authorization import EscopoLeitura
-from src.modules.reports.domain.escopo import EscopoGravado, escopo_cobre
+from src.modules.reports.domain.escopo import (
+    EscopoGravado,
+    escopo_cobre,
+    escopo_gravado,
+    escopo_para_gravar,
+)
 
 U1 = UUID("018f0000-0000-7000-8000-000000000001")
 U2 = UUID("018f0000-0000-7000-8000-000000000002")
@@ -116,3 +122,42 @@ def test_aceita_o_escopo_de_leitura_do_modulo_de_acesso() -> None:
 
     assert escopo_cobre(usuario, EscopoGravado(distritos=(2,)))
     assert not escopo_cobre(usuario, EscopoGravado(distritos=(3,)))
+
+
+# `scope_snapshot` ↔ `EscopoGravado` (nota da T12 para a T5 e a T6): sem a volta exata, um
+# download legítimo daria 403, e a geração leria outro escopo.
+
+
+def test_escopo_gravado_volta_igual_ao_que_foi_gravado() -> None:
+    """005/R1.3, R3.3"""
+    for escopo in (
+        EscopoGravado(global_=True),
+        EscopoGravado(areas=(2, 1), distritos=(3,), unidades=(uuid4(), uuid4())),
+        EscopoGravado(),
+    ):
+        snapshot = json.loads(json.dumps(escopo_para_gravar(escopo)))
+        volta = escopo_gravado(snapshot)
+
+        assert volta.global_ is escopo.global_
+        assert set(volta.areas) == set(escopo.areas)
+        assert set(volta.distritos) == set(escopo.distritos)
+        assert set(volta.unidades) == set(escopo.unidades)
+        assert escopo_cobre(volta, escopo) is escopo_cobre(escopo, escopo)
+
+
+@pytest.mark.parametrize(
+    "snapshot",
+    [
+        {},
+        {"global": "sim", "areas": [], "distritos": [], "unidades": []},
+        {"global": False, "areas": ["1"], "distritos": [], "unidades": []},
+        {"global": False, "areas": [True], "distritos": [], "unidades": []},
+        {"global": False, "areas": [], "distritos": [], "unidades": ["nao-e-uuid"]},
+        {"global": False, "areas": [], "distritos": [], "unidades": [], "extra": 1},
+        {"global": False, "areas": 1, "distritos": [], "unidades": []},
+    ],
+)
+def test_escopo_gravado_fora_do_formato_falha_fechado(snapshot: dict[str, object]) -> None:
+    """005/R1.3 (deny by default: nada vira escopo maior)"""
+    with pytest.raises(ValueError, match="fora do formato"):
+        escopo_gravado(snapshot)

@@ -136,7 +136,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R5.1, R5.2, R5.4, R5.5
   - Pronto quando: `tests/unit/reports/test_assinatura.py` e `tests/integration/reports/test_chaves_publicas.py` passam
-- [ ] T5. Caso de uso da geração e do envio
+- [x] T5. Caso de uso da geração e do envio
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_gerar_relatorio.py`
   - Frente: C
   - Faz:
     - `gerar_relatorio(id)`: `gerando` só se `pendente`, geração no escopo gravado, assinatura, envio com a sessão de quem pediu, conferência e remoção;
