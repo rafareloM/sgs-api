@@ -31,8 +31,11 @@ nota() { printf '       %s\n' "$*"; }
 # Tira o id da conta (12 dígitos) de qualquer texto que vá para a tela.
 mascarar() { sed -E 's/(^|[^0-9])[0-9]{12}([^0-9]|$)/\1<ID_DA_CONTA>\2/g'; }
 
-# Primeira linha útil de um erro do AWS CLI, sem o id da conta.
-resumo_do_erro() { grep -m1 -E '[^[:space:]]' "$1" | mascarar; }
+# ARN de quem roda, sem o id da conta e sem o nome da sessão (no Learner Lab ele traz o e-mail).
+mascarar_arn() { sed -E 's#(:assumed-role/[^/]+)/.*#\1/<SESSAO>#' | mascarar; }
+
+# Primeira linha útil de um erro do AWS CLI, sem o id da conta nem nome de sessão.
+resumo_do_erro() { grep -m1 -E '[^[:space:]]' "$1" | sed -E 's#(:assumed-role/[^/ ]+)/[^ ]*#\1/<SESSAO>#g' | mascarar; }
 
 aws_() { aws --region "$REGIAO" --output json "$@"; }
 
@@ -71,7 +74,7 @@ sondar() {
 	conta="$(jq -r .Account <<<"$identidade")"
 	quem="$(jq -r .Arn <<<"$identidade")"
 	papel="arn:aws:iam::${conta}:role/${PAPEL_DO_LAB}"
-	ok "identidade: $(mascarar <<<"$quem") (região $REGIAO)"
+	ok "identidade: $(mascarar_arn <<<"$quem") (região $REGIAO)"
 	if [[ "$quem" != *":assumed-role/${PAPEL_DO_LAB}/"* ]]; then
 		nota "Daqui o AssumeRole testa '$(cut -d/ -f2 <<<"$quem") -> ${PAPEL_DO_LAB}'. Quem decide é"
 		nota "a sondagem na instância, onde a ${PAPEL_DO_LAB} assume a ${PAPEL_DO_LAB}."

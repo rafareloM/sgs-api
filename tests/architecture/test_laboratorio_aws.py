@@ -158,7 +158,8 @@ def _saida(resultado: subprocess.CompletedProcess[str]) -> str:
 
 
 def _nada_sensivel(saida: str) -> None:
-    for segredo in (SEGREDO_DO_PAPEL, TOKEN_DO_PAPEL, CHAVE_DO_PAPEL, CONTA):
+    # O nome da sessão do Learner Lab traz o e-mail de quem roda (aqui, "Fulano").
+    for segredo in (SEGREDO_DO_PAPEL, TOKEN_DO_PAPEL, CHAVE_DO_PAPEL, CONTA, "Fulano", "user1"):
         assert segredo not in saida
 
 
