@@ -51,7 +51,13 @@ falha() { printf 'FALHA  %s\n' "$*"; }
 nota() { printf '       %s\n' "$*"; }
 
 # Só no processo principal: um erro dentro de $(...) não repete a mensagem.
-trap '[[ $BASHPID == "$$" ]] && falha "interrompido na linha $LINENO; o que já foi criado fica (veja: lab.sh estado)"' ERR
+# Uma função que já explicou a falha termina com `return 1`, e esse retorno não ganha aviso. O
+# aviso fica para o que quebrou no meio do caminho (inclusive o `return "$rc"` do aws_).
+ao_errar() {
+	[[ $BASHPID == "$$" && "$2" != "return 1" ]] || return 0
+	falha "interrompido na linha $1; o que já foi criado fica (veja: lab.sh estado)"
+}
+trap 'ao_errar "$LINENO" "$BASH_COMMAND"' ERR
 
 # Tira o id da conta (12 dígitos) de qualquer texto que vá para a tela.
 mascarar() { sed -E 's/(^|[^0-9])[0-9]{12}([^0-9]|$)/\1<ID_DA_CONTA>\2/g'; }
@@ -420,7 +426,7 @@ subir() {
 		return 1
 	fi
 	local cidrs
-	cidrs="$(ips_liberados)"
+	cidrs="$(ips_liberados)" || return 1
 	ok "commit ${commit:0:12}; 443 liberada para: $(paste -sd' ' <<<"$cidrs")"
 
 	local ami chave_kms external_id
@@ -507,7 +513,7 @@ liberar_ip() {
 		falha "não há grupo de segurança do laboratório (use 'lab.sh subir')"
 		return 1
 	fi
-	cidrs="$(ips_liberados)"
+	cidrs="$(ips_liberados)" || return 1
 	GRUPO_ID="$(jq -r .GroupId <<<"$grupo")"
 	aplicar_443 "$cidrs" "$grupo"
 	ok "443 liberada para: $(paste -sd' ' <<<"$cidrs")"
@@ -527,7 +533,7 @@ parar() {
 	precisa aws jq
 	exigir_credenciais
 	local instancia
-	instancia="$(instancia_ou_falha)"
+	instancia="$(instancia_ou_falha)" || return 1
 	aws_ ec2 stop-instances --instance-ids "$instancia" >/dev/null
 	ok "instância $instancia parando; os dados e o IP elástico ficam"
 }
@@ -536,7 +542,7 @@ ligar() {
 	precisa aws jq
 	exigir_credenciais
 	local instancia ip
-	instancia="$(instancia_ou_falha)"
+	instancia="$(instancia_ou_falha)" || return 1
 	aws_ ec2 start-instances --instance-ids "$instancia" >/dev/null
 	aws_ ec2 wait instance-running --instance-ids "$instancia"
 	ok "instância $instancia ligada; o compose volta sozinho em alguns minutos"
@@ -653,6 +659,9 @@ api_lab() {
 
 status_http() { cat "$TEMP_EV/status"; }
 
+# URL de objeto do S3 da AWS, no endereço global (bucket.s3.amazonaws.com) ou no regional.
+url_e_da_aws() { [[ "$1" =~ ^https://[a-z0-9.-]+\.s3(\.[a-z0-9-]+)?\.amazonaws\.com/ ]]; }
+
 # Guarda o access token num arquivo de cabeçalho e devolve o caminho.
 cabecalho_de() {
 	local arquivo="$TEMP_EV/aut-$1"
@@ -739,7 +748,7 @@ grupo_id() {
 mapear_gestor_dados() {
 	local grupo="$1" autorizacao="$2"
 	if api_lab GET /admin/mapeamentos-grupo "" "$autorizacao" |
-		jq -e --arg g "$grupo" '[(.itens // .)[] | select(.grupo_id == $g and .papel == "GESTOR_DADOS")] | length > 0' >/dev/null; then
+		jq -e --arg g "$grupo" '[(if type == "array" then . else .itens end)[] | select(.grupo_id == $g and .papel == "GESTOR_DADOS")] | length > 0' >/dev/null; then
 		return 0
 	fi
 	api_lab POST /admin/mapeamentos-grupo \
@@ -859,9 +868,11 @@ evidencia() {
 	sha_hex="$(jq -r '.integridade.sha256 // ""' <<<"$relatorio")"
 	url="$(api_lab GET "/relatorios/$pedido/download" "" "$aut_gestor" | jq -r '.url // empty')"
 	download="$(curl -sS -o "$temp/relatorio" -w '%{http_code}' "$url" || echo 000)"
+	local na_aws=false
+	if url_e_da_aws "$url"; then na_aws=true; fi
 	download="$(jq -cn --arg s "$download" --arg h "$(sha256sum "$temp/relatorio" 2>/dev/null | cut -d' ' -f1)" \
-		--arg e "$sha_hex" --arg u "$url" '{status: ($s | tonumber), sha256_confere: ($h == $e),
-		url_na_aws: ($u | test("^https://[^/]+\\.s3\\.[a-z0-9-]+\\.amazonaws\\.com/"))}')"
+		--arg e "$sha_hex" --argjson aws "$na_aws" '{status: ($s | tonumber), sha256_confere: ($h == $e),
+		url_na_aws: $aws}')"
 	confere "download pela URL pré-assinada (200) com o SHA-256 da integridade" \
 		'.status == 200 and .sha256_confere and .url_na_aws' "$download"
 	sem_assinatura="$(curl -sS -o "$temp/sem" -w '%{http_code}' "${url%%\?*}" || echo 000)"
@@ -943,8 +954,11 @@ evidencia() {
 
 	# 10. O arquivo da evidência, sem id de conta, sem IP e sem nada assinado.
 	local destino commit
-	commit="$(aws_ ec2 get-console-output --instance-id "$(jq -r .InstanceId <<<"$(instancia_do_lab)")" 2>/dev/null |
-		jq -r '.Output // ""' | grep -o 'código em [^ ]* ([0-9a-f]*)' | tail -n1 | grep -o '([0-9a-f]*)' | tr -d '()' || true)"
+	# O commit que a instância roda está no próprio user-data (só a linha COMMIT= é lida).
+	commit="$(aws_ ec2 describe-instance-attribute --attribute userData \
+		--instance-id "$(jq -r .InstanceId <<<"$(instancia_do_lab)")" 2>/dev/null |
+		jq -r '.UserData.Value // ""' | base64 -d 2>/dev/null |
+		sed -n 's/^COMMIT="\([0-9a-f]\{7,40\}\)"$/\1/p' | head -n1 || true)"
 	destino="$RAIZ/docs/operacao/evidencias/laboratorio-aws-$(date +%F).json"
 	mkdir -p "$(dirname "$destino")"
 	jq -n --arg data "$(date -u +%FT%TZ)" --arg regiao "$REGIAO" --arg commit "${commit:-desconhecido}" \

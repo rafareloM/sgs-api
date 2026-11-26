@@ -118,6 +118,8 @@ if op == ("sts", "assume-role"):
 if op == ("kms", "describe-key"):
     sai({"KeyMetadata": {"Arn": os.environ["AWS_FALSO_CHAVE_KMS"], "KeyManager": "AWS"}})
 if op == ("ssm", "get-parameter"):
+    if cenario == "ami_negada":
+        erro("AccessDeniedException", "GetParameter", "not authorized")
     sai({"Parameter": {"Value": "ami-0falso"}})
 if op == ("s3api", "create-bucket"):
     sai({"Location": "/" + opcoes["--bucket"]})
@@ -722,6 +724,52 @@ def test_evidencia_sem_a_senha_do_admin_explica_onde_buscar(tmp_path: Path) -> N
         str(op).split()[1].startswith(("get-", "describe-", "list-")) for op in _ops(chamadas)
     )
     assert "evidência gravada" not in saida
+
+
+@pytest.mark.parametrize(
+    ("url", "da_aws"),
+    [
+        # Endereço global, o que a API assinou na 1ª evidência real (26/11/2026).
+        (
+            "https://sgs-lab-relatorios-0a0b.s3.amazonaws.com/reports/2026/11/x.csv?X-Amz-Expires=300",
+            True,
+        ),
+        ("https://sgs-lab-relatorios-0a0b.s3.us-east-1.amazonaws.com/reports/x.csv", True),
+        ("https://s3.localhost/sgs-relatorios/reports/x.csv", False),
+        ("http://sgs-lab-relatorios-0a0b.s3.amazonaws.com/reports/x.csv", False),
+        ("https://exemplo.com/?u=https://b.s3.amazonaws.com/", False),
+    ],
+)
+def test_url_e_da_aws_aceita_endereco_global_e_regional(url: str, da_aws: bool) -> None:
+    script = f'source "{LAB}"; url_e_da_aws "$1" && echo sim || echo nao'
+    resultado = subprocess.run(  # noqa: S603 - script do próprio repositório
+        [BASH, "-c", script, "teste", url], capture_output=True, text=True, check=True, timeout=30
+    )
+    assert resultado.stdout.strip() == ("sim" if da_aws else "nao")
+
+
+@pytest.mark.parametrize(
+    ("argumentos", "cenario"),
+    [(("parar",), "ok"), (("destruir",), "ok"), (("estado",), "sem_credenciais")],
+)
+def test_subcomando_que_falha_nao_se_diz_interrompido(
+    tmp_path: Path, argumentos: tuple[str, ...], cenario: str
+) -> None:
+    resultado, _ = _roda_lab(tmp_path, *argumentos, cenario=cenario)
+
+    assert resultado.returncode == 1
+    assert "interrompido" not in _saida(resultado)
+
+
+def test_falha_da_aws_no_meio_de_subir_avisa_que_foi_interrompido(tmp_path: Path) -> None:
+    resultado, chamadas = _roda_lab(tmp_path, "subir", cenario="ami_negada")
+
+    saida = _saida(resultado)
+    assert resultado.returncode != 0
+    assert "aws ssm get-parameter:" in saida
+    assert "AccessDeniedException" in saida
+    assert "interrompido na linha" in saida
+    assert "ec2 run-instances" not in _ops(chamadas)
 
 
 # --- sobreposição do compose e Caddyfile ----------------------------------------------------------

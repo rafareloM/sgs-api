@@ -196,7 +196,8 @@ Fica fora da lista acima, porque depende de conta. Se a conta permitir criar pap
 
 A conta que o grupo tem é um *Learner Lab* do AWS Academy, que não deixa criar papel IAM. A T13 abaixo adapta a evidência a ela.
 
-- [ ] T13. Laboratório na AWS (Learner Lab) e evidência
+- [x] T13. Laboratório na AWS (Learner Lab) e evidência
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/architecture/test_laboratorio_aws.py` e `docs/operacao/evidencias/laboratorio-aws-2026-11-26.json` (15 de 15 conferências numa conta real; a sondagem na instância confirmou o caminho `AssumeRole` sem mudar o código).
   - Status: **Aprovado (G3: Rafael (rafareloM), dono, em 26/11/2026)**. Proposta do agente; registro por autorização expressa dada na sessão de trabalho. Decisões do Rafael na mesma sessão:
     - conta = *Learner Lab* do AWS Academy: credenciais temporárias, `LabRole` e `LabInstanceProfile` prontos, sem criar papel nem usuário IAM, só `us-east-1`;
     - recursos do menor porte do nível gratuito, sempre com o comando de parar e o de destruir;

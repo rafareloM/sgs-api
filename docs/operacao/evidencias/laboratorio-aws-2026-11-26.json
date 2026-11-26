@@ -1,0 +1,175 @@
+{
+  "tarefa": "005/T13",
+  "gerado_em": "2026-11-26T21:09:35Z",
+  "regiao": "us-east-1",
+  "commit_da_instancia": "0fb74be89b64a6916b180c84c567e3c5e6aeef0c",
+  "conta": "<ID_DA_CONTA> (Learner Lab do AWS Academy)",
+  "endereco": "https://<IP_DO_LAB>.sslip.io/",
+  "resultado": "tudo conferido",
+  "falhas": [],
+  "tls_publico": {
+    "certificado_confiavel": true,
+    "emissor": "Let's Encrypt"
+  },
+  "diretorio": {
+    "sincronizacao_ldap": {
+      "status": "concluida",
+      "usuarios": {
+        "criados": 0,
+        "atualizados": 8,
+        "desativados": 0
+      },
+      "grupos": {
+        "criados": 0,
+        "atualizados": 7,
+        "desativados": 0
+      },
+      "conflitos": []
+    },
+    "login_ldap_2fa": {
+      "usuario": "ldap.gestor.dados",
+      "me": {
+        "username": "ldap.gestor.dados",
+        "origem": "ldap",
+        "papeis": [
+          {
+            "papel": "GESTOR_DADOS",
+            "origem": "group",
+            "escopo_tipo": "global"
+          }
+        ]
+      }
+    },
+    "login_oidc": {
+      "usuario": "oidc.gestor.dados",
+      "primeiro_acesso": {
+        "inicio_vai_ao_keycloak": true,
+        "keycloak_volta_ao_callback": true,
+        "callback_status": 302,
+        "callback_volta_ao_front_sem_erro": true,
+        "token_pela_renovacao": true
+      },
+      "depois_do_mapeamento": {
+        "inicio_vai_ao_keycloak": true,
+        "keycloak_volta_ao_callback": true,
+        "callback_status": 302,
+        "callback_volta_ao_front_sem_erro": true,
+        "token_pela_renovacao": true
+      },
+      "me": {
+        "username": "oidc.gestor.dados",
+        "origem": "oidc",
+        "papeis": [
+          {
+            "papel": "GESTOR_DADOS",
+            "origem": "group",
+            "escopo_tipo": "global"
+          }
+        ]
+      }
+    }
+  },
+  "relatorio": {
+    "id": "01a219b0-fd1c-75ff-97ed-39c6e40c6201",
+    "tipo": "inventario_unidades",
+    "formato": "csv",
+    "status": "concluido",
+    "tamanho_bytes": 4509,
+    "erro": null,
+    "integridade": {
+      "sha256": "ad1a90281981899c8ca3574edbc9c344077dd5a0175d1fc949409af5f9885827",
+      "assinatura": "4nUW9HJlqeN3yW2VMHQhqb4uSjm7H45kJZ7YktjzyZZCNMMlEh0wxO4x-Im47br41MPNSy9QqOb87Pj5a4zdhg",
+      "algoritmo": "ES256",
+      "kid": "rel-lab-2026-11-26"
+    }
+  },
+  "s3": {
+    "bucket": "sgs-lab-relatorios-b3f89233d8b8",
+    "identidade_do_envio": {
+      "papel": "LabRole",
+      "sessao": "sgs-01a219ac-63b2-7da9-b087-ed4f21732210",
+      "duracao_s": 900,
+      "external_id_enviado": true,
+      "quem_assumiu": "arn:aws:sts::<ID_DA_CONTA>:assumed-role/LabRole/<INSTANCIA>",
+      "quando": "2026-11-26T21:04:36Z"
+    },
+    "objeto": {
+      "ServerSideEncryption": "aws:kms",
+      "SSEKMSKeyId": "arn:aws:kms:us-east-1:<ID_DA_CONTA>:key/4afaa963-3f13-4150-8882-f72ff06e1ad5",
+      "ChecksumSHA256": "rRqQKBmBiZyMo1dO28nDRAd91aAXXR/JSUCa9fmIWCc=",
+      "VersionId": "2oY7Bz6ZVR33YiASQqtkaJXs24MtvHpW",
+      "chave_e_a_aws_s3": true,
+      "sha256_confere": true
+    },
+    "download_pre_assinado": {
+      "status": 200,
+      "sha256_confere": true,
+      "url_na_aws": true
+    },
+    "mesma_url_sem_assinatura": {
+      "status": 403,
+      "codigo": "AccessDenied"
+    },
+    "url_assinada_por_http": {
+      "status": 403,
+      "codigo": "AccessDenied"
+    },
+    "put_sem_kms": {
+      "recusado": true,
+      "codigo": "AccessDenied"
+    },
+    "configuracao_do_bucket": {
+      "bloqueio_publico": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+      },
+      "versionamento": "Enabled",
+      "criptografia_padrao": {
+        "SSEAlgorithm": "aws:kms",
+        "KMSMasterKeyID": "arn:aws:kms:us-east-1:<ID_DA_CONTA>:key/4afaa963-3f13-4150-8882-f72ff06e1ad5"
+      },
+      "ciclo_de_vida": [
+        {
+          "ID": "sgs-relatorios-90-dias",
+          "Status": "Enabled",
+          "Filter": {
+            "Prefix": "reports/"
+          },
+          "Expiration": {
+            "Days": 90
+          },
+          "NoncurrentVersionExpiration": {
+            "NoncurrentDays": 1
+          }
+        },
+        {
+          "ID": "sgs-marcadores-orfaos",
+          "Status": "Enabled",
+          "Filter": {
+            "Prefix": "reports/"
+          },
+          "Expiration": {
+            "ExpiredObjectDeleteMarker": true
+          },
+          "NoncurrentVersionExpiration": null
+        }
+      ],
+      "politica": [
+        {
+          "Sid": "NegaSemTLS",
+          "Effect": "Deny"
+        },
+        {
+          "Sid": "NegaPutSemKmsValorErrado",
+          "Effect": "Deny"
+        },
+        {
+          "Sid": "NegaPutSemKmsCabecalhoAusente",
+          "Effect": "Deny"
+        }
+      ]
+    }
+  }
+}
