@@ -24,6 +24,7 @@ from src.modules.identity.application.login import (
     Origem,
     ResultadoDoLogin,
     auditar,
+    auditar_atualizacao,
     desafiar_ou_abrir_sessao,
 )
 from src.modules.identity.domain.diretorio import (
@@ -164,6 +165,7 @@ async def _provisionar(
     await diretorio.repositorio.update_synced_user(
         conta.id, display_name=atualizada.display_name, email=atualizada.email, agora=agora
     )
+    await auditar_atualizacao(deps, origem, conta, atualizada, "ldap")
     return atualizada
 
 

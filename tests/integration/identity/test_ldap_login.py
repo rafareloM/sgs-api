@@ -22,7 +22,7 @@ from src.modules.identity.domain.diretorio import (
 from src.modules.identity.domain.users import User, UserSource
 from src.modules.identity.infrastructure.repository import SqlUserRepository
 from tests.factories import make_user
-from tests.integration.acesso import Sessoes, eventos
+from tests.integration.acesso import GLOBAL, Sessoes, bearer, eventos, logado
 from tests.integration.identity.autenticacao import codigo, segredo_da_uri, usuario_local
 
 SENHA_LDAP = "senha-do-diretorio-123"
@@ -335,3 +335,68 @@ async def test_login_renomeado_no_diretorio_conta_falhas_e_bloqueia_a_mesma_cont
     conta = await _conta(sessoes, ANA.external_id)
     assert conta is not None
     assert conta["locked_until"] is not None
+
+
+async def _derivadas(sessoes: Sessoes, usuario: UUID) -> list[tuple[str, str]]:
+    async with sessoes() as sessao:
+        linhas = await sessao.execute(
+            text(
+                "SELECT r.code, a.origin FROM role_assignments a JOIN roles r ON r.id = a.role_id"
+                " WHERE a.user_id = :id AND a.origin = 'group' ORDER BY r.code"
+            ),
+            {"id": usuario},
+        )
+        return [(str(codigo), str(origem)) for codigo, origem in linhas.all()]
+
+
+async def test_login_recalcula_as_derivadas_pelos_grupos_do_diretorio(
+    app: FastAPI, cliente: httpx.AsyncClient, sessoes: Sessoes, diretorio: DiretorioFalso
+) -> None:
+    """004/R2.3, 003/R3.2 (revisão da frente A, S3: o grupo mapeado dá o papel no login; fora
+    do grupo no diretório, o login seguinte tira o papel)"""
+    async with sessoes() as sessao, sessao.begin():
+        grupo = uuid7()
+        await sessao.execute(
+            text(
+                "INSERT INTO groups (id, source, external_id, name)"
+                " VALUES (:id, 'ldap', :ext, :nome)"
+            ),
+            {"id": grupo, "ext": TI.external_id, "nome": TI.name},
+        )
+    admin = bearer(app, await logado(sessoes, ("ADMIN_TI", GLOBAL)))
+    mapeamento = await cliente.post(
+        "/api/v1/admin/mapeamentos-grupo",
+        json={"grupo_id": str(grupo), "papel": "AUDITOR", "escopo_tipo": "global"},
+        headers=admin,
+    )
+    assert mapeamento.status_code == 201, mapeamento.text
+
+    assert (await _login(cliente, ANA.login)).status_code == 200
+    conta = await _conta(sessoes, ANA.external_id)
+    assert conta is not None
+    assert await _derivadas(sessoes, conta["id"]) == [("AUDITOR", "group")]
+    assert len(await eventos(sessoes, "papel.atribuido")) == 1
+
+    diretorio.grupos[ANA.dn] = ()
+    assert (await _login(cliente, ANA.login)).status_code == 200
+
+    assert await _derivadas(sessoes, conta["id"]) == []
+    assert len(await eventos(sessoes, "papel.removido")) == 1
+
+
+async def test_login_audita_a_mudanca_de_nome_e_email_sem_os_valores(
+    cliente: httpx.AsyncClient, sessoes: Sessoes, diretorio: DiretorioFalso
+) -> None:
+    """004/R1.6, regra 5 do AGENTS.md (revisão da frente A, S4: `usuario.atualizado` só com os
+    nomes dos campos; sem mudança, nada é gravado)"""
+    conta = await _conta_ldap(sessoes)
+
+    await _login(cliente, ANA.login)
+    await _login(cliente, ANA.login)
+
+    [atualizado] = await eventos(sessoes, "usuario.atualizado")
+    assert atualizado["entity_id"] == str(conta)
+    assert atualizado["metadata"] == {"origem": "ldap", "campos": ["display_name", "email"]}
+    assert ANA.email is not None
+    assert ANA.email not in str(atualizado)
+    assert ANA.display_name not in str(atualizado)

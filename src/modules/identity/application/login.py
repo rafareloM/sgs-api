@@ -44,6 +44,7 @@ __all__ = [
     "TokensEmitidos",
     "abrir_sessao",
     "auditar",
+    "auditar_atualizacao",
     "cadastrar_mfa",
     "confirmar_mfa",
     "desafiar_ou_abrir_sessao",
@@ -390,3 +391,28 @@ async def auditar(
         resultado="failure" if falhou else "success",
         categoria="autenticacao" if falhou else None,
     )
+
+
+async def auditar_atualizacao(
+    deps: Identidade, origem: Origem, antes: User, depois: User, fonte: str
+) -> None:
+    """Regra 5 do AGENTS.md (revisão da frente A, S4): o nome e o e-mail que o diretório mudou no
+    login vão para a trilha como `usuario.atualizado`, só com os nomes dos campos (sem os
+    valores, que são dados pessoais). Sem mudança, nada é gravado."""
+    campos = [
+        campo
+        for campo, de, para in (
+            ("display_name", antes.display_name, depois.display_name),
+            ("email", antes.email, depois.email),
+        )
+        if de != para
+    ]
+    if campos:
+        await auditar(
+            deps,
+            "usuario.atualizado",
+            origem,
+            antes.id,
+            {"origem": fonte, "campos": campos},
+            tipo="sistema",
+        )

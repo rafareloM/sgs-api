@@ -31,6 +31,7 @@ from src.modules.identity.application.login import (
     TokensEmitidos,
     abrir_sessao,
     auditar,
+    auditar_atualizacao,
 )
 from src.modules.identity.domain.oidc import (
     MotivoDeRecusa,
@@ -201,7 +202,7 @@ async def _provisionar(
     await oidc.diretorio.update_synced_user(
         conta.id, display_name=dado.display_name, email=email, agora=agora
     )
-    return User(
+    atualizada = User(
         id=conta.id,
         username=conta.username,
         display_name=dado.display_name,
@@ -209,6 +210,8 @@ async def _provisionar(
         email=email,
         external_id=conta.external_id,
     )
+    await auditar_atualizacao(deps, origem, conta, atualizada, "oidc")
+    return atualizada
 
 
 async def _ocupado(deps: Identidade, username: str, email: str | None) -> bool:
