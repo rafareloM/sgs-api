@@ -40,6 +40,8 @@ MAPA: dict[str, Esperado] = {
         "diretorio.sincronizado", "execucao_diretorio"
     ),
     "POST /api/v1/unidades": Esperado("unidade.criada", "unidade"),
+    # A geração em segundo plano audita `relatorio.exportado` depois; o fato da rota é o pedido.
+    "POST /api/v1/relatorios": Esperado("relatorio.solicitado", "relatorio"),
     "PATCH /api/v1/unidades/{id}": Esperado("unidade.atualizada", "unidade"),
     "POST /api/v1/unidades/{id}/desativar": Esperado("unidade.desativada", "unidade"),
     "POST /api/v1/unidades/{id}/equipamentos": Esperado(

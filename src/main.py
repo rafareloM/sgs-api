@@ -5,11 +5,14 @@ import contextlib
 import functools
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
+from typing import Any
 
+import anyio.to_thread
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.core import health
@@ -62,7 +65,16 @@ from src.modules.registry.infrastructure.repository import (
     SqlRepositorioDeVinculos,
 )
 from src.modules.reports.api import jwks as relatorios_jwks
+from src.modules.reports.api import relatorios
+from src.modules.reports.api.relatorios import transacoes_dos_relatorios
+from src.modules.reports.application.gerar import Destino, Geracao
+from src.modules.reports.application.gerar import marcar_interrompidos as relatorios_interrompidos
 from src.modules.reports.infrastructure.assinatura import Es256AssinadorDeRelatorio
+from src.modules.reports.infrastructure.consultas import SqlConsultasDeRelatorio
+from src.modules.reports.infrastructure.generators import novo_gerador
+from src.modules.reports.infrastructure.referencias import SqlReferenciasDosFiltros
+from src.modules.reports.infrastructure.repository import SqlRepositorioDePedidos
+from src.modules.reports.infrastructure.s3_storage import ConfiguracaoS3, S3ArmazenamentoDeObjetos
 
 
 @asynccontextmanager
@@ -94,6 +106,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 name="agendador-do-diretorio",
             )
     app.state.agendador_do_diretorio = agendador
+    if app.state.geracao_de_relatorios is not None:
+        # Spec 005, design § Geração e envio, passo 8: o que ficou pendente ou gerando morreu
+        # com o processo anterior.
+        await relatorios_interrompidos(
+            transacoes=app.state.geracao_de_relatorios.transacoes,
+            agora=lambda: datetime.now(UTC),
+        )
     try:
         yield
     finally:
@@ -112,6 +131,47 @@ def _agenda(settings: Settings) -> Agenda | None:
         return analisar(settings.ldap_sync_cron)
     except CronInvalido as erro:
         raise SettingsError(f"LDAP_SYNC_CRON: {erro}") from None
+
+
+def _geracao_de_relatorios(settings: Settings, estado: Any) -> Geracao | None:
+    """Spec 005: sem S3_BUCKET (ou sem chave de assinatura), a exportação fica desligada e o
+    pedido e o download respondem 503 (R2.9). O `Settings` já recusou o que `prod` não aceita."""
+    assinador = estado.assinador_de_relatorio
+    if not settings.exportacao_ligada or assinador is None or settings.s3_bucket is None:
+        return None
+    configuracao = ConfiguracaoS3(
+        bucket=settings.s3_bucket,
+        regiao=settings.s3_region or "us-east-1",
+        sse=settings.s3_sse,
+        endpoint_url=settings.s3_endpoint_url,
+        public_endpoint_url=settings.s3_endpoint_publico,
+        ca_file=str(settings.s3_ca_file) if settings.s3_ca_file else None,
+        addressing_style=settings.s3_addressing_style,
+        assume_role_arn=settings.s3_assume_role_arn,
+        external_id=settings.s3_external_id,
+        kms_key_id=settings.s3_kms_key_id,
+        access_key_id=_segredo(settings.s3_access_key_id),
+        secret_access_key=_segredo(settings.s3_secret_access_key),
+    )
+    return Geracao(
+        transacoes=transacoes_dos_relatorios(estado),
+        consultas=SqlConsultasDeRelatorio(estado.engine),
+        armazenamento=S3ArmazenamentoDeObjetos(configuracao),
+        assinador=assinador,
+        novo_gerador=novo_gerador,
+        em_thread=anyio.to_thread.run_sync,
+        destino=Destino(
+            bucket=settings.s3_bucket,
+            sse=settings.s3_sse,
+            kms_key_id=settings.s3_kms_key_id,
+            retencao=timedelta(days=settings.report_retention_days),
+        ),
+        agora=lambda: datetime.now(UTC),
+    )
+
+
+def _segredo(valor: SecretStr | None) -> str | None:
+    return None if valor is None else valor.get_secret_value()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -168,6 +228,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.repositorio_de_vinculos = SqlRepositorioDeVinculos
     app.state.repositorio_de_referencias = SqlRepositorioDeReferencias
     app.state.consultas_dashboard = SqlConsultasDashboard
+    # Relatórios (spec 005): pedidos e conferência dos filtros sobre a sessão da requisição; a
+    # geração em segundo plano, com o S3, só com S3_BUCKET.
+    app.state.repositorio_de_pedidos = SqlRepositorioDePedidos
+    app.state.referencias_dos_filtros = SqlReferenciasDosFiltros
+    app.state.geracao_de_relatorios = _geracao_de_relatorios(settings, app.state)
     # Um resolvedor por processo: o cache de permissões é dele (design da 003, passo 3).
     app.state.resolvedor_de_permissoes = ResolvedorDePermissoes()
     # `ResourceRef.tipo` → fábrica do `ResolvedorDeAlvo` daquele tipo de recurso (design da 003,
@@ -186,6 +251,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dashboard.router)
     app.include_router(dashboard.painel)
     app.include_router(auditoria.router)
+    app.include_router(relatorios.router)
 
     # O último middleware adicionado é o mais externo: contexto > cabeçalhos > CORS > rotas.
     app.add_middleware(

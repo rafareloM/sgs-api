@@ -23,6 +23,7 @@ from tests.integration.acesso import (
 )
 from tests.integration.audit.cobertura import EXCECOES, MAPA, rotas_de_escrita
 from tests.integration.identity.autenticacao import codigo, login, segredo_da_uri, usuario_local
+from tests.integration.reports.falsos import geracao_falsa
 
 AGENTE = "cobertura-013/1.0"
 
@@ -213,6 +214,15 @@ async def test_rota_grava_evento_completo(
         "DELETE /api/v1/admin/mapeamentos-grupo/{id_}",
         lambda: cliente.delete(
             f"/api/v1/admin/mapeamentos-grupo/{ctx['mapeamento']}", headers=admin
+        ),
+    )
+    app.state.geracao_de_relatorios = geracao_falsa(app.state)
+    passo(
+        "POST /api/v1/relatorios",
+        lambda: cliente.post(
+            "/api/v1/relatorios",
+            json={"tipo": "inventario_unidades", "formato": "csv"},
+            headers=gestor,
         ),
     )
     app.state.diretorio = _DiretorioVazio()

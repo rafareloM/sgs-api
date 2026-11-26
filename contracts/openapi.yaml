@@ -4866,6 +4866,321 @@
           }
         ]
       }
+    },
+    "/api/v1/relatorios": {
+      "post": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Pedir um relatório",
+        "description": "R1.1 a R1.5: 202 com o id; a geração segue em segundo plano. `inventario_unidades` exige\n`unidade:read`; `trilha_auditoria`, `auditoria:read`.",
+        "operationId": "pedir_api_v1_relatorios_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/PedidoDoInventarioIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PedidoDaTrilhaIn"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "tipo",
+                  "mapping": {
+                    "inventario_unidades": "#/components/schemas/PedidoDoInventarioIn",
+                    "trilha_auditoria": "#/components/schemas/PedidoDaTrilhaIn"
+                  }
+                },
+                "title": "Corpo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PedidoCriadoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `relatorio:export` ou sem a permissão de dados do tipo",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Tipo, formato ou filtros inválidos",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Exportação não configurada (sem `S3_BUCKET`)",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Relatórios pedidos",
+        "description": "R3.5: do mais recente ao mais antigo; os do usuário, ou todos para `GESTOR_DADOS`.",
+        "operationId": "listar_api_v1_relatorios_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StatusDoPedido"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "description": "Página, a partir de 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página, a partir de 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (padrão 20, máximo 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (padrão 20, máximo 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaOut_RelatorioOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `relatorio:export`",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/relatorios/{id_}": {
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Um relatório",
+        "description": "R3.1, R3.3, R5.3: status, e `integridade` quando concluído.",
+        "operationId": "consultar_api_v1_relatorios__id___get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatorioOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Nem quem pediu, nem escopo que cubra o do pedido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "404": {
+            "description": "Relatório inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/relatorios/{id_}/download": {
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "URL de download de um relatório",
+        "description": "R3.2 a R3.4, R3.6: 200 com a URL de 5 minutos no endereço público; `no-store`.",
+        "operationId": "baixar_api_v1_relatorios__id___download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `relatorio:download`, ou nem quem pediu nem escopo que cubra",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "404": {
+            "description": "Relatório inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "409": {
+            "description": "Relatório não concluído ou vencido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Exportação não configurada (sem `S3_BUCKET`)",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5429,6 +5744,26 @@
           "network_percent_without_cnes"
         ],
         "title": "DistritoSemCnesOut"
+      },
+      "DownloadOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expira_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expira Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expira_em"
+        ],
+        "title": "DownloadOut",
+        "description": "D005-1: a URL pré-assinada é uma credencial de 5 minutos (`no-store`)."
       },
       "EnrollOut": {
         "properties": {
@@ -6170,6 +6505,127 @@
         ],
         "title": "ExecucaoOut"
       },
+      "FiltrosDaTrilha": {
+        "properties": {
+          "de": {
+            "type": "string",
+            "format": "date-time",
+            "title": "De"
+          },
+          "ate": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ate"
+          },
+          "acao": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "pattern": "^[a-z][a-z0-9_.]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acao",
+            "description": "Prefixo da ação."
+          },
+          "entidade_tipo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entidade Tipo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "de",
+          "ate"
+        ],
+        "title": "FiltrosDaTrilha",
+        "description": "Filtros de `trilha_auditoria`: período obrigatório de até 366 dias (R1.5), prefixo da\nação e tipo de entidade.\n\n- `de` incluído e `ate` excluído, como as consultas da auditoria (`occurred_at < :ate`).\n- Data e hora com fuso: sem ele, o instante dependeria do fuso da sessão do banco."
+      },
+      "FiltrosDoInventario": {
+        "properties": {
+          "distrito_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32767.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distrito Id"
+          },
+          "area_tecnica_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32767.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Tecnica Id"
+          },
+          "tipo_unidade_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32767.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Unidade Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ativa",
+                  "inativa",
+                  "em_implantacao"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FiltrosDoInventario",
+        "description": "Filtros de `inventario_unidades` (`vw_unit_inventory`), todos opcionais."
+      },
+      "FormatoDeRelatorio": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "xlsx"
+        ],
+        "title": "FormatoDeRelatorio",
+        "description": "R1.2."
+      },
       "GrupoOut": {
         "properties": {
           "id": {
@@ -6234,6 +6690,35 @@
           "status"
         ],
         "title": "HealthStatus"
+      },
+      "IntegridadeOut": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "assinatura": {
+            "type": "string",
+            "title": "Assinatura"
+          },
+          "algoritmo": {
+            "type": "string",
+            "title": "Algoritmo"
+          },
+          "kid": {
+            "type": "string",
+            "title": "Kid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "assinatura",
+          "algoritmo",
+          "kid"
+        ],
+        "title": "IntegridadeOut",
+        "description": "R5.3: o hash do arquivo e a assinatura, para conferir fora da API (R5.4)."
       },
       "InventarioOut": {
         "properties": {
@@ -6966,6 +7451,37 @@
         ],
         "title": "PaginaOut[RegistroDoBancoOut]"
       },
+      "PaginaOut_RelatorioOut_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/RelatorioOut"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho"
+        ],
+        "title": "PaginaOut[RelatorioOut]"
+      },
       "PaginaOut_UnidadeForaDoCnesOut_": {
         "properties": {
           "itens": {
@@ -7109,6 +7625,82 @@
           "linhas"
         ],
         "title": "ParticaoOut"
+      },
+      "PedidoCriadoOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "pendente",
+            "title": "Status",
+            "default": "pendente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PedidoCriadoOut"
+      },
+      "PedidoDaTrilhaIn": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "trilha_auditoria",
+            "title": "Tipo"
+          },
+          "formato": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Formato"
+          },
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosDaTrilha"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tipo",
+          "formato",
+          "filtros"
+        ],
+        "title": "PedidoDaTrilhaIn"
+      },
+      "PedidoDoInventarioIn": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "inventario_unidades",
+            "title": "Tipo"
+          },
+          "formato": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Formato"
+          },
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosDoInventario",
+            "default": {}
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tipo",
+          "formato"
+        ],
+        "title": "PedidoDoInventarioIn"
       },
       "QualidadeOut": {
         "properties": {
@@ -7326,6 +7918,116 @@
           "pela_api"
         ],
         "title": "RegistroDoBancoOut"
+      },
+      "RelatorioOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoDeRelatorio"
+          },
+          "formato": {
+            "$ref": "#/components/schemas/FormatoDeRelatorio"
+          },
+          "filtros": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filtros"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusDoPedido"
+          },
+          "solicitado_por": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Solicitado Por"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          },
+          "concluido_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concluido Em"
+          },
+          "tamanho_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tamanho Bytes"
+          },
+          "vence_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence Em"
+          },
+          "vencido": {
+            "type": "boolean",
+            "title": "Vencido"
+          },
+          "erro": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erro"
+          },
+          "integridade": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntegridadeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "formato",
+          "filtros",
+          "status",
+          "solicitado_por",
+          "criado_em",
+          "concluido_em",
+          "tamanho_bytes",
+          "vence_em",
+          "vencido",
+          "erro",
+          "integridade"
+        ],
+        "title": "RelatorioOut"
       },
       "ResumoOut": {
         "properties": {
@@ -7557,6 +8259,17 @@
         "title": "SituacaoConciliacao",
         "description": "Lado da conciliação unidade x equipamento em que a linha caiu (011/R2.2)."
       },
+      "StatusDoPedido": {
+        "type": "string",
+        "enum": [
+          "pendente",
+          "gerando",
+          "concluido",
+          "falhou"
+        ],
+        "title": "StatusDoPedido",
+        "description": "R1.1, R2.5, R2.6."
+      },
       "TipoDeReferencia": {
         "type": "string",
         "enum": [
@@ -7568,6 +8281,15 @@
         ],
         "title": "TipoDeReferencia",
         "description": "As referências expostas em `/referencias/{tipo}` (006/R7.1), com o nome da tabela."
+      },
+      "TipoDeRelatorio": {
+        "type": "string",
+        "enum": [
+          "inventario_unidades",
+          "trilha_auditoria"
+        ],
+        "title": "TipoDeRelatorio",
+        "description": "R1.2."
       },
       "TokenOut": {
         "properties": {

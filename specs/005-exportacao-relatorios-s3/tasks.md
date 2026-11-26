@@ -147,7 +147,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T1, T2, T3, T9, T11
   - Requisitos: R1.3, R2.5, R2.6, R2.8, R5.1
   - Pronto quando: `tests/integration/reports/test_gerar_relatorio.py` passa
-- [ ] T6. Rotas de pedido, consulta, listagem e download
+- [x] T6. Rotas de pedido, consulta, listagem e download
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_report_routes.py`
   - Frente: C
   - Faz:
     - `POST /relatorios` com a permissão de dados do tipo e `relatorio.solicitado`;
