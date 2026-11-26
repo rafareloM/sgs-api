@@ -12,7 +12,7 @@
 | PyJWT[crypto] | 2.15.x (ES256) |
 | pwdlib[argon2] | 0.3.x |
 | pyotp | 2.10.x |
-| Authlib | 1.8.x |
+| Authlib | 1.9.x (ADR-0007, emenda 3 de 24/11/2026: correções de segurança) |
 | ldap3 | 2.9.1 |
 | boto3 | 1.43.x |
 | cryptography | 50.x |

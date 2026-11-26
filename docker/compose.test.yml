@@ -7,3 +7,11 @@ services:
     healthcheck:
       interval: 2s
       start_period: 5s
+  keycloak:
+    healthcheck:
+      interval: 2s
+      start_period: 20s
+  ldap:
+    healthcheck:
+      interval: 2s
+      start_period: 5s

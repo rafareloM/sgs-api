@@ -1,0 +1,61 @@
+# cn=config do LDAP de laboratório (spec 004, design § `slapd`), gravado no build da imagem com
+# `slapadd -n 0`. A base (olcDatabase={1}mdb) fica no volume ldap-data.
+#
+# Quem pode o quê:
+#   - o usuário do contêiner (uid 389), pelo ldapi: tudo. É o caminho da carga inicial e das
+#     alterações do roteiro (`docker compose exec ldap ldapmodify -Y EXTERNAL -H ldapi:///`);
+#   - a conta de serviço cn=sgs-sync: só leitura, e nunca de userPassword;
+#   - qualquer um: o bind (auth) e a leitura do rootDSE e do esquema; nada mais.
+
+dn: cn=config
+objectClass: olcGlobal
+cn: config
+olcPidFile: /run/slapd/slapd.pid
+olcArgsFile: /run/slapd/slapd.args
+# Certificado do servicos-certs (SAN só `ldap`); TLS 1.2 ou maior.
+olcTLSCertificateFile: /certs/server.crt
+olcTLSCertificateKeyFile: /certs/server.key
+olcTLSProtocolMin: 3.3
+
+dn: cn=module{0},cn=config
+objectClass: olcModuleList
+cn: module{0}
+olcModulePath: /usr/lib/ldap
+olcModuleLoad: back_mdb
+
+dn: cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: schema
+
+include: file:///etc/ldap/schema/core.ldif
+
+include: file:///etc/ldap/schema/cosine.ldif
+
+include: file:///etc/ldap/schema/inetorgperson.ldif
+
+dn: olcDatabase={-1}frontend,cn=config
+objectClass: olcDatabaseConfig
+objectClass: olcFrontendConfig
+olcDatabase: {-1}frontend
+olcAccess: {0}to dn.base="" by * read
+olcAccess: {1}to dn.base="cn=Subschema" by * read
+
+dn: olcDatabase={0}config,cn=config
+objectClass: olcDatabaseConfig
+olcDatabase: {0}config
+olcAccess: {0}to * by dn.exact="gidNumber=389+uidNumber=389,cn=peercred,cn=external,cn=auth" manage by * none
+
+dn: olcDatabase={1}mdb,cn=config
+objectClass: olcDatabaseConfig
+objectClass: olcMdbConfig
+olcDatabase: {1}mdb
+olcSuffix: dc=recife,dc=pe,dc=gov,dc=br
+olcDbDirectory: /var/lib/ldap
+olcDbIndex: objectClass eq
+olcDbIndex: entryUUID eq
+olcDbIndex: uid eq
+olcDbIndex: mail eq
+olcDbIndex: member eq
+olcAccess: {0}to * by dn.exact="gidNumber=389+uidNumber=389,cn=peercred,cn=external,cn=auth" manage by * break
+olcAccess: {1}to attrs=userPassword by anonymous auth by * none
+olcAccess: {2}to * by dn.exact="cn=sgs-sync,ou=servicos,dc=recife,dc=pe,dc=gov,dc=br" read by * none

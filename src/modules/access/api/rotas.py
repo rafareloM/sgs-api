@@ -1,4 +1,5 @@
-"""`GET /me` e administração de papéis e atribuições (spec 003, design § Rotas; T6 e T7)."""
+"""`GET /me` e administração de papéis, atribuições e mapeamentos grupo→papel (spec 003, design
+§ Rotas; T6, T7 e T8)."""
 
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal, Self
@@ -17,6 +18,7 @@ from src.modules.access.api.deps import (
     require,
 )
 from src.modules.access.application import atribuicoes as casos
+from src.modules.access.application import mapeamentos as casos_de_mapeamento
 
 router = APIRouter(prefix="/api/v1", tags=["acesso"])
 
@@ -87,6 +89,37 @@ class AtribuicaoIn(BaseModel):
     escopo_tipo: Literal["global", "area", "distrito", "unidade"]
     escopo_id: str | None = Field(default=None, max_length=36)
     valido_ate: datetime | None = None
+
+
+class MapeamentoIn(BaseModel):
+    """003/R3.1: o grupo do diretório, o papel e o escopo exigido pelo papel (R2.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    grupo_id: UUID = Field(description="Id do grupo do diretório (spec 004).")
+    papel: str = Field(min_length=1, max_length=50)
+    escopo_tipo: Literal["global", "area", "distrito", "unidade"]
+    escopo_id: str | None = Field(default=None, max_length=36)
+
+
+class MapeamentoOut(BaseModel):
+    id: UUID
+    grupo_id: UUID
+    papel: str
+    escopo_tipo: str
+    escopo_id: str | None
+    criado_por: UUID
+
+    @classmethod
+    def de(cls, m: casos_de_mapeamento.MapeamentoDeGrupo) -> Self:
+        return cls(
+            id=m.id,
+            grupo_id=m.grupo_id,
+            papel=m.papel,
+            escopo_tipo=m.scope_type,
+            escopo_id=m.scope_id,
+            criado_por=m.criado_por,
+        )
 
 
 @router.get("/me", summary="Perfil do usuário logado", responses={401: _ERROS[401]})
@@ -184,6 +217,78 @@ async def remover(
         id_,
         quem=usuario,
         ator=ator_da_requisicao(request, usuario),
+        atribuicoes=estado.repositorio_de_atribuicoes(sessao),
+        permissoes=estado.repositorio_de_permissoes(sessao),
+        auditoria=estado.auditoria(sessao),
+    )
+    return Response(status_code=204)
+
+
+@router.get("/admin/mapeamentos-grupo", summary="Mapeamentos grupo→papel", responses=_ERROS)
+async def listar_mapeamentos(
+    request: Request, usuario: Administrador, sessao: SessaoDeNegocio
+) -> list[MapeamentoOut]:
+    """003/R3: os mapeamentos, na ordem de criação."""
+    itens = await casos_de_mapeamento.listar_mapeamentos(
+        mapeamentos=request.app.state.repositorio_de_mapeamentos(sessao)
+    )
+    return [MapeamentoOut.de(m) for m in itens]
+
+
+@router.post(
+    "/admin/mapeamentos-grupo",
+    status_code=201,
+    summary="Mapear grupo do diretório para papel",
+    responses={
+        401: _ERROS[401],
+        403: _problema(
+            "Sem `papel:assign`, ou mapeamento de grupo de que se é membro (segregação de funções)"
+        ),
+        409: _problema("O grupo já está mapeado para este papel neste escopo"),
+        422: _problema("Papel ou escopo inválidos"),
+    },
+)
+async def mapear(
+    request: Request, corpo: MapeamentoIn, usuario: Administrador, sessao: SessaoDeNegocio
+) -> MapeamentoOut:
+    """003/R3.1: os membros ativos do grupo recebem o papel (origem `group`), que vale na
+    próxima requisição deles (R4.5); audita `mapeamento.criado` e cada `papel.atribuido`."""
+    estado = request.app.state
+    mapeamento = await casos_de_mapeamento.criar_mapeamento(
+        grupo_id=corpo.grupo_id,
+        papel=corpo.papel,
+        escopo_tipo=corpo.escopo_tipo,
+        escopo_id=corpo.escopo_id,
+        quem=usuario,
+        ator=ator_da_requisicao(request, usuario),
+        novo_id=uuid7(),
+        mapeamentos=estado.repositorio_de_mapeamentos(sessao),
+        atribuicoes=estado.repositorio_de_atribuicoes(sessao),
+        membros=estado.membros_de_grupo(sessao),
+        permissoes=estado.repositorio_de_permissoes(sessao),
+        auditoria=estado.auditoria(sessao),
+        gerar_id=uuid7,
+    )
+    return MapeamentoOut.de(mapeamento)
+
+
+@router.delete(
+    "/admin/mapeamentos-grupo/{id_}",
+    status_code=204,
+    summary="Remover mapeamento grupo→papel",
+    responses={**_ERROS, 404: _problema("Mapeamento inexistente")},
+)
+async def remover_mapeamento(
+    request: Request, id_: UUID, usuario: Administrador, sessao: SessaoDeNegocio
+) -> Response:
+    """003/R3.2, R3.3: saem as atribuições derivadas do mapeamento (cada uma auditada como
+    `papel.removido`); as diretas ficam. Audita `mapeamento.removido`."""
+    estado = request.app.state
+    await casos_de_mapeamento.remover_mapeamento(
+        id_,
+        quem=usuario,
+        ator=ator_da_requisicao(request, usuario),
+        mapeamentos=estado.repositorio_de_mapeamentos(sessao),
         atribuicoes=estado.repositorio_de_atribuicoes(sessao),
         permissoes=estado.repositorio_de_permissoes(sessao),
         auditoria=estado.auditoria(sessao),

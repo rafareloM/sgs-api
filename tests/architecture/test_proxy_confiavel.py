@@ -45,8 +45,11 @@ def _config(ambiente: dict[str, str]) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
         timeout=60,
-        cwd=RAIZ / "tests",  # fora de docker/, para não ler um docker/.env local
-        env=sem_borda | ambiente,
+        # Um docker/.env local não pode entrar: o Compose antigo procura o .env no diretório atual
+        # (por isso o cwd fora de docker/); o novo procura ao lado do compose.yml e só obedece à
+        # variável COMPOSE_DISABLE_ENV_FILE.
+        cwd=RAIZ / "tests",
+        env=sem_borda | {"COMPOSE_DISABLE_ENV_FILE": "true"} | ambiente,
     )
 
 
@@ -85,22 +88,33 @@ def test_sem_forwarded_allow_ips_curinga_nem_subnet() -> None:
 
 def test_compose_exige_subnet_e_ip_do_proxy() -> None:
     """013/R3.7: sem as variáveis o compose não resolve; as redes separam borda e dados, e o banco
-    fica fora da borda e sem porta publicada."""
+    fica fora da borda e sem porta publicada. 004 (design § Redes; D004-13): os serviços de
+    laboratório ficam em `integracoes` (com a API) e `exposicao` (com o proxy), sem porta no host,
+    e proxy e API continuam só com a `borda` em comum (013/R3.1)."""
     sem_variaveis = _config({})
     assert sem_variaveis.returncode != 0
     assert "SGS_BORDA" in sem_variaveis.stderr
 
-    servicos = _resolvido()["services"]
+    config = _resolvido()
+    servicos = config["services"]
 
     redes = {nome: set(s["networks"]) for nome, s in servicos.items()}
     assert redes == {
         "db-certs": {"dados"},
+        "servicos-certs": {"exposicao"},
         "db": {"dados"},
-        "api": {"borda", "dados"},
-        "proxy": {"borda"},
+        "api": {"borda", "dados", "integracoes"},
+        "keycloak": {"integracoes", "exposicao"},
+        "ldap": {"integracoes"},
+        # Spec 005 (T8): a API envia pela `integracoes`; o navegador baixa pelo proxy.
+        "s3": {"integracoes", "exposicao"},
+        "s3-init": {"integracoes"},
+        "proxy": {"borda", "exposicao"},
     }
-    assert "ports" not in servicos["api"]
-    assert "ports" not in servicos["db"]
+    assert redes["api"] & redes["proxy"] == {"borda"}
+    assert config["networks"]["integracoes"]["internal"] is True
+    for servico in ("api", "db", "keycloak", "ldap", "s3", "s3-init"):
+        assert "ports" not in servicos[servico], servico
 
 
 def test_subnets_das_suites_sao_unicas_e_fora_dos_pools_do_docker() -> None:
@@ -111,6 +125,11 @@ def test_subnets_das_suites_sao_unicas_e_fora_dos_pools_do_docker() -> None:
         "TLS": RAIZ / "tests" / "e2e" / "test_tls_banco.py",
         "FRONT_UI": RAIZ / "tests" / "e2e_front" / "conftest.py",
         "AUDITORIA": RAIZ / "tests" / "e2e" / "test_auditoria_proxy.py",
+        "KEYCLOAK": RAIZ / "tests" / "e2e" / "test_lab_keycloak.py",
+        "LDAP": RAIZ / "tests" / "e2e" / "test_lab_ldap.py",
+        "S3": RAIZ / "tests" / "e2e" / "test_export_s3.py",
+        "SYNC_LDAP": RAIZ / "tests" / "e2e" / "test_sync_ldap.py",
+        "LOGIN": RAIZ / "tests" / "e2e" / "test_login_ldap_oidc.py",
     }
     assert set(suites) == set(SUBNETS)
     for suite, arquivo in suites.items():

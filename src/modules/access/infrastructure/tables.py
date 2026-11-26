@@ -73,8 +73,8 @@ group_role_mappings = Table(
     "group_role_mappings",
     metadata,
     Column("id", Uuid, primary_key=True),
-    # Sem FK por enquanto: a tabela `groups` nasce na spec 004 (T1).
-    Column("group_id", Uuid, nullable=False),
+    # `groups` é do módulo identity (spec 004, migração 0004_diretorio).
+    Column("group_id", Uuid, ForeignKey("groups.id", ondelete="RESTRICT"), nullable=False),
     Column("role_id", Uuid, ForeignKey("roles.id"), nullable=False),
     Column("scope_type", String(10), nullable=False),
     Column("scope_id", String(36), nullable=True),

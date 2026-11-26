@@ -2,7 +2,7 @@ import { html, montar } from '../html.js';
 import { ic } from '../ui/icone.js';
 import { toast } from '../ui/toast.js';
 import { digitos } from '../ui/format.js';
-import { entrar, cadastrarMfa, confirmarMfa, verificarMfa, chaveDaUri } from '../auth.js';
+import { entrar, cadastrarMfa, confirmarMfa, verificarMfa, chaveDaUri, provedores } from '../auth.js';
 
 // Login com segundo fator (spec 012, R2.1 a R2.3, R2.7, R2.8, R2.10, R2.11; DF6, DF7).
 // Mesma marcação do protótipo; sem contas, senhas ou códigos de demonstração (R2.10).
@@ -22,6 +22,10 @@ const lado = html`
       <small style="opacity:.7;position:relative">Grupo 01 — CESAR School, Projeto 3.</small>
     </section>`;
 
+// Entrada pelo provedor de identidade (spec 004, R3.9): navegação comum até a API, que redireciona.
+const entradaOidc = (ligada) => (ligada
+  ? html`<a class="btn btn-line" href="/api/v1/auth/oidc/login" style="width:100%;padding:12px;margin-top:16px">Entrar pelo provedor de identidade</a>` : '');
+
 const resumoDeErro = (mensagem) => (mensagem
   ? html`<div class="err-summary" style="margin:0" role="alert"><b>${ic('alert')}${mensagem}</b></div>` : '');
 
@@ -37,7 +41,8 @@ function telaUsuario(estado) {
             <button class="btn btn-primary" type="submit" style="width:100%;padding:12px">Continuar</button>
             <button class="btn btn-quiet" type="button" id="lg-forgot" style="align-self:center">Esqueci minha senha</button>
           </div>
-        </form>`;
+        </form>
+        <div data-ref="oidc">${entradaOidc(estado.oidc)}</div>`;
 }
 
 function telaCadastro(estado) {
@@ -151,4 +156,10 @@ export function mostrarLogin(aoEntrar, estadoInicial = {}) {
   };
 
   desenhar();
+  // Uma consulta por abertura do login; a entrada aparece sem redesenhar o que já foi digitado.
+  provedores().then(({ oidc }) => {
+    estado.oidc = oidc;
+    const lugar = document.querySelector('.login-box [data-ref=oidc]');
+    if (oidc && lugar) montar(lugar, entradaOidc(true));
+  });
 }

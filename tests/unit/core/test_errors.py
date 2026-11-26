@@ -15,6 +15,7 @@ from src.core.errors import (
     FieldError,
     Forbidden,
     NotFound,
+    ServiceUnavailable,
 )
 from src.main import create_app
 from tests.factories import make_settings
@@ -44,6 +45,7 @@ def _app() -> FastAPI:
             "nao-encontrado": NotFound("Unidade 42 não encontrada."),
             "proibido": Forbidden("Fora do seu escopo."),
             "conflito": Conflict("CNES já cadastrado."),
+            "indisponivel": ServiceUnavailable("Serviço de diretório indisponível."),
             "dominio": DomainValidationError(
                 "A unidade tem dados inválidos.",
                 errors=[FieldError(campo="cep", mensagem="CEP deve ter 8 dígitos.")],
@@ -89,6 +91,18 @@ async def test_erro_de_negocio_vira_problem_json(tipo: str, status: int, detalhe
     corpo = _assert_problem(resposta, status)
     assert corpo["detail"] == detalhe
     assert str(corpo["type"]).startswith("urn:sgs:problema:")
+
+
+async def test_service_unavailable_responde_503() -> None:
+    """001/R3.1. O 503 que a 004 (diretório indisponível ou não configurado) e a 005
+    (exportação não configurada) usam (004/T0, 005/T0)."""
+    async with _cliente(_app()) as cliente:
+        resposta = await cliente.get("/teste/negocio/indisponivel")
+
+    corpo = _assert_problem(resposta, 503)
+    assert corpo["detail"] == "Serviço de diretório indisponível."
+    assert corpo["type"] == "urn:sgs:problema:servico-indisponivel"
+    assert corpo["title"] == "Serviço indisponível"
 
 
 async def test_rota_inexistente_vira_problem_json() -> None:

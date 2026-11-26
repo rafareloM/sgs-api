@@ -12,9 +12,18 @@ import httpx
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from tests.integration.acesso import GLOBAL, Sessoes, bearer, id_pelo_codigo, logado
+from src.modules.identity.domain.diretorio import DirectorySnapshot
+from tests.integration.acesso import (
+    GLOBAL,
+    Sessoes,
+    bearer,
+    grupo_espelhado,
+    id_pelo_codigo,
+    logado,
+)
 from tests.integration.audit.cobertura import EXCECOES, MAPA, rotas_de_escrita
 from tests.integration.identity.autenticacao import codigo, login, segredo_da_uri, usuario_local
+from tests.integration.reports.falsos import geracao_falsa
 
 AGENTE = "cobertura-013/1.0"
 
@@ -27,6 +36,13 @@ def test_toda_rota_de_escrita_esta_mapeada(app: FastAPI) -> None:
     assert rotas - MAPA.keys() - EXCECOES.keys() == set(), "rota de escrita sem mapa"
     assert (MAPA.keys() | EXCECOES.keys()) - rotas == set(), "mapa com rota inexistente"
     assert not MAPA.keys() & EXCECOES.keys()
+
+
+class _DiretorioVazio:
+    """Diretório LDAP sem ninguém: a sincronização só fecha a execução (004/T4)."""
+
+    async def snapshot(self) -> DirectorySnapshot:
+        return DirectorySnapshot(users=(), groups=())
 
 
 async def _ultimo_id(sessoes: Sessoes) -> int:
@@ -58,6 +74,8 @@ async def test_rota_grava_evento_completo(
     agente = {"User-Agent": AGENTE}
     async with sessoes() as sessao:
         farmacia = await sessao.scalar(text("SELECT id FROM service_types WHERE code = 'FARMACIA'"))
+    async with sessoes() as sessao, sessao.begin():
+        grupo = await grupo_espelhado(sessao)
     unidade_corpo = {
         "nome": "CAPS Cobertura",
         "tipo_unidade_id": await id_pelo_codigo(sessoes, "tipo_unidade", "CAPS_II"),
@@ -185,6 +203,34 @@ async def test_rota_grava_evento_completo(
         lambda: cliente.delete(f"/api/v1/admin/atribuicoes/{ctx['atribuicao']}", headers=admin),
     )
     passo(
+        "POST /api/v1/admin/mapeamentos-grupo",
+        lambda: cliente.post(
+            "/api/v1/admin/mapeamentos-grupo",
+            json={"grupo_id": str(grupo), "papel": "AUDITOR", "escopo_tipo": "global"},
+            headers=admin,
+        ),
+    )
+    passo(
+        "DELETE /api/v1/admin/mapeamentos-grupo/{id_}",
+        lambda: cliente.delete(
+            f"/api/v1/admin/mapeamentos-grupo/{ctx['mapeamento']}", headers=admin
+        ),
+    )
+    app.state.geracao_de_relatorios = geracao_falsa(app.state)
+    passo(
+        "POST /api/v1/relatorios",
+        lambda: cliente.post(
+            "/api/v1/relatorios",
+            json={"tipo": "inventario_unidades", "formato": "csv"},
+            headers=gestor,
+        ),
+    )
+    app.state.diretorio = _DiretorioVazio()
+    passo(
+        "POST /api/v1/admin/diretorio/sincronizar",
+        lambda: cliente.post("/api/v1/admin/diretorio/sincronizar", headers=admin),
+    )
+    passo(
         "POST /api/v1/auth/login",
         lambda: cliente.post(
             "/api/v1/auth/login",
@@ -274,6 +320,7 @@ def _guardar_ids(chave: str, resposta: httpx.Response, ctx: dict[str, Any]) -> N
         "POST /api/v1/servicos": "servico_solto",
         "POST /api/v1/referencias/{tipo}": "referencia",
         "POST /api/v1/admin/atribuicoes": "atribuicao",
+        "POST /api/v1/admin/mapeamentos-grupo": "mapeamento",
     }.get(chave)
     if destino is not None:
         ctx[destino] = corpo["id"]

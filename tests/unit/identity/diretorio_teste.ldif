@@ -1,0 +1,64 @@
+# Diretório de teste do adaptador ldap3 (004/T2), carregado no MOCK_SYNC.
+# Senhas só de teste, com o marcador "exemplo".
+
+dn: cn=sgs-sync,ou=servicos,dc=teste
+objectClass: inetOrgPerson
+cn: sgs-sync
+sn: sync
+userPassword: senha-exemplo-servico
+
+dn: uid=ana,ou=pessoas,dc=teste
+objectClass: inetOrgPerson
+uid: ana
+cn: Ana Souza
+sn: Souza
+mail: Ana.Souza@Recife.PE.gov.br
+entryUUID: 0b1f6a7e-0000-4000-8000-000000000001
+telephoneNumber: 81 3355-0001
+userPassword: senha-exemplo-ana
+
+dn: uid=bruno,ou=pessoas,dc=teste
+objectClass: inetOrgPerson
+uid: Bruno
+cn: Bruno Lima
+sn: Lima
+entryUUID: 0b1f6a7e-0000-4000-8000-000000000002
+userPassword: senha-exemplo-bruno
+
+dn: uid=carla,ou=pessoas,dc=teste
+objectClass: inetOrgPerson
+uid: carla
+cn: Carla Dias
+sn: Dias
+mail: carla@recife.pe.gov.br
+entryUUID: 0b1f6a7e-0000-4000-8000-000000000003
+
+dn: uid=davi,ou=pessoas,dc=teste
+objectClass: inetOrgPerson
+uid: davi
+cn: Davi Rocha
+sn: Rocha
+mail: davi@recife.pe.gov.br
+entryUUID: 0b1f6a7e-0000-4000-8000-000000000004
+
+dn: uid=elisa,ou=pessoas,dc=teste
+objectClass: inetOrgPerson
+uid: elisa
+cn: Elisa Melo
+sn: Melo
+mail: elisa@recife.pe.gov.br
+entryUUID: 0b1f6a7e-0000-4000-8000-000000000005
+
+dn: cn=gestores,ou=grupos,dc=teste
+objectClass: groupOfNames
+cn: gestores
+entryUUID: 0b1f6a7e-0000-4000-8000-0000000000a1
+member: uid=ana,ou=pessoas,dc=teste
+member: uid=bruno,ou=pessoas,dc=teste
+
+dn: cn=analistas,ou=grupos,dc=teste
+objectClass: groupOfNames
+cn: analistas
+entryUUID: 0b1f6a7e-0000-4000-8000-0000000000a2
+member: uid=ana,ou=pessoas,dc=teste
+member: uid=carla,ou=pessoas,dc=teste

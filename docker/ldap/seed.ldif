@@ -1,0 +1,153 @@
+# Carga inicial do LDAP de laboratório (spec 004, R5.1; design § `slapd`), aplicada pelo ldapi na
+# primeira subida (iniciar.sh). Pessoas e grupos fictícios.
+#
+# Senhas fixas, versionadas e só do laboratório (D004-15), guardadas em {SSHA}: a da conta de
+# serviço é `sgs-lab-exemplo-bind`, a de todas as pessoas, `sgs-lab-exemplo-usuario`. O marcador
+# `exemplo` faz a API recusá-las em prod (R5.4).
+#
+# Um usuário por papel da spec 003, cada um num grupo `groupOfNames` cujo nome diz o papel e o
+# escopo (o mapeamento grupo → papel é feito pela API, 003/R3.1), e `ldap.temporario`, no grupo
+# do DS-III, para a demonstração da desativação (R5.3). Usernames e e-mails diferentes dos do
+# Keycloak (`oidc.*`) e do seed de demonstração (`demo.*`): a R4.3 recusa conta de outra origem.
+
+dn: dc=recife,dc=pe,dc=gov,dc=br
+objectClass: dcObject
+objectClass: organization
+dc: recife
+o: Secretaria de Saúde do Recife (laboratório)
+
+dn: ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: organizationalUnit
+ou: pessoas
+
+dn: ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: organizationalUnit
+ou: grupos
+
+dn: ou=servicos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: organizationalUnit
+ou: servicos
+
+# Conta de serviço da API (LDAP_BIND_DN): só leitura, pela ACL do config.ldif.
+dn: cn=sgs-sync,ou=servicos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: organizationalRole
+objectClass: simpleSecurityObject
+cn: sgs-sync
+description: Conta de serviço da sincronização da API (só leitura)
+userPassword: {SSHA}5wt5pFa54zIAoZHElKWQr3UpVpGeK4i5zbTqCg==
+
+dn: uid=ldap.admin.ti,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.admin.ti
+cn: Admin TI (fictício)
+givenName: Admin TI
+sn: Fictício
+mail: ldap.admin.ti@ldap.lab.example.org
+userPassword: {SSHA}6gHzEAQx9iUZ/AjyeauxfmeOIqpzAY89R0Ya+w==
+
+dn: uid=ldap.gestor.dados,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.gestor.dados
+cn: Gestor de Dados (fictício)
+givenName: Gestor de Dados
+sn: Fictício
+mail: ldap.gestor.dados@ldap.lab.example.org
+userPassword: {SSHA}t69MNaCWLfsL4YA+uhNipPHzTecrD//w7Fe5GQ==
+
+dn: uid=ldap.coord.tecnico,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.coord.tecnico
+cn: Coordenação Técnica APS (fictício)
+givenName: Coordenação Técnica APS
+sn: Fictício
+mail: ldap.coord.tecnico@ldap.lab.example.org
+userPassword: {SSHA}+g2Awp16vfTV+p6eewI+yGnlz0TW8wEbYcC0VA==
+
+dn: uid=ldap.tecnico.ds3,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.tecnico.ds3
+cn: Técnico DS-III (fictício)
+givenName: Técnico DS-III
+sn: Fictício
+mail: ldap.tecnico.ds3@ldap.lab.example.org
+userPassword: {SSHA}+S4vAkHX46tjzxrj+z45rt2wTH0kDegAvRb/mQ==
+
+dn: uid=ldap.gestor.unidade,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.gestor.unidade
+cn: Gestão da UPA Santo Amaro (fictício)
+givenName: Gestão da UPA Santo Amaro
+sn: Fictício
+mail: ldap.gestor.unidade@ldap.lab.example.org
+userPassword: {SSHA}twrG/NAUk47RzKMZBfbKxCF6rPMZD0pj2yMnLw==
+
+dn: uid=ldap.diretoria,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.diretoria
+cn: Diretoria (fictício)
+givenName: Diretoria
+sn: Fictício
+mail: ldap.diretoria@ldap.lab.example.org
+userPassword: {SSHA}J6rCHYjrvzYpHrEEcTkMVZ91jWjHdFJrhFj6GA==
+
+dn: uid=ldap.auditor,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.auditor
+cn: Auditoria (fictício)
+givenName: Auditoria
+sn: Fictício
+mail: ldap.auditor@ldap.lab.example.org
+userPassword: {SSHA}dl8DHHeztSchZ7pN/IBLtPwu3EOBm8dwWthNKg==
+
+# O da demonstração da desativação: apagado no roteiro, some na sincronização seguinte.
+dn: uid=ldap.temporario,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: inetOrgPerson
+uid: ldap.temporario
+cn: Contrato Temporário DS-III (fictício)
+givenName: Contrato Temporário DS-III
+sn: Fictício
+mail: ldap.temporario@ldap.lab.example.org
+userPassword: {SSHA}8XhEosUw57vUEaUln/shjp7CUhMbddy8FSq1Zw==
+
+dn: cn=sgs-admin-ti,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-admin-ti
+description: ADMIN_TI, escopo global
+member: uid=ldap.admin.ti,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+
+dn: cn=sgs-gestor-dados,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-gestor-dados
+description: GESTOR_DADOS, escopo global
+member: uid=ldap.gestor.dados,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+
+dn: cn=sgs-coord-tecnico-aps,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-coord-tecnico-aps
+description: COORD_TECNICO, área técnica APS
+member: uid=ldap.coord.tecnico,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+
+dn: cn=sgs-tecnico-ds3,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-tecnico-ds3
+description: TECNICO_DISTRITAL, distrito DS-III
+member: uid=ldap.tecnico.ds3,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+member: uid=ldap.temporario,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+
+dn: cn=sgs-gestor-unidade-cnes-1000003,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-gestor-unidade-cnes-1000003
+description: GESTOR_UNIDADE, unidade CNES 1000003 (UPA Santo Amaro)
+member: uid=ldap.gestor.unidade,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+
+dn: cn=sgs-diretoria,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-diretoria
+description: DIRETORIA, escopo global
+member: uid=ldap.diretoria,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+
+dn: cn=sgs-auditor,ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+objectClass: groupOfNames
+cn: sgs-auditor
+description: AUDITOR, escopo global
+member: uid=ldap.auditor,ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br

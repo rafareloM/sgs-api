@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.core.ids import uuid7
+from tests.integration.acesso import grupo_espelhado
 from tests.integration.postgres import BancoDeTeste, motor
 
 UNIDADE = str(uuid7())
@@ -35,7 +36,7 @@ async def _usuario_e_mapeamento(engine: AsyncEngine) -> tuple[UUID, UUID]:
                 "INSERT INTO group_role_mappings (id, group_id, role_id, scope_type, created_by)"
                 " SELECT :id, :grupo, id, 'global', :usuario FROM roles WHERE code = 'DIRETORIA'"
             ),
-            {"id": mapeamento, "grupo": uuid7(), "usuario": usuario},
+            {"id": mapeamento, "grupo": await grupo_espelhado(conexao), "usuario": usuario},
         )
     return usuario, mapeamento
 

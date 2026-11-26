@@ -93,3 +93,12 @@ class TooManyRequests(AppError):
     status = 429
     type = "urn:sgs:problema:muitas-requisicoes"
     title = "Muitas requisições"
+
+
+class ServiceUnavailable(AppError):
+    """503: um serviço externo de que a operação depende está fora ou não foi configurado
+    (004: diretório LDAP; 005: armazenamento dos relatórios)."""
+
+    status = 503
+    type = "urn:sgs:problema:servico-indisponivel"
+    title = "Serviço indisponível"

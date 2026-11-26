@@ -23,6 +23,13 @@ def nivel_exigido(escopos_maximos: Iterable[str]) -> str:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Atribuicao:
+    """Um papel atribuído a um usuário num escopo.
+
+    `origin` é `direct` (pela rota de administração) ou `group` (derivada de um mapeamento de
+    grupo, R3); `granted_by`, quem atribuiu, se direta; `valid_until`, a expiração (R2.3);
+    `group_mapping_id`, o mapeamento que gerou a derivada (nulo se direta).
+    """
+
     id: UUID
     user_id: UUID
     papel: str
@@ -31,6 +38,7 @@ class Atribuicao:
     origin: str
     valid_until: datetime | None
     granted_by: UUID | None
+    group_mapping_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

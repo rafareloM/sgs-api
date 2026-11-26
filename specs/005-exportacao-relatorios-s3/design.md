@@ -170,7 +170,7 @@ class AssinadorDeRelatorio(Protocol):
 | `REPORT_SIGNING_KEYS_FILE` (ou `REPORT_SIGNING_KEYS`) | `/run/secrets/report-keys.json` | obrigatória com `S3_BUCKET`; em `prod`, chave de exemplo recusada; nenhuma chave igual às JWT | R5.1, R5.2 |
 | `REPORT_RETENTION_DAYS` | `90` | 1 a 3650 | G1 (guarda de 90 dias) |
 
-- **Recusas em `prod` (R2.9).** Falta de `S3_BUCKET`, `S3_ASSUME_ROLE_ARN`, `S3_EXTERNAL_ID` ou `S3_KMS_KEY_ID` em ARN; `S3_SSE` diferente de `aws:kms`; qualquer chave fixa configurada. Chave fixa é `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, ou as variáveis do SDK `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` e `AWS_PROFILE`, que `Settings` declara só para recusar.
+- **Recusas em `prod` (R2.9).** Falta de `S3_BUCKET`, `S3_ASSUME_ROLE_ARN`, `S3_EXTERNAL_ID` ou `S3_KMS_KEY_ID` em ARN; `S3_SSE` diferente de `aws:kms`; qualquer chave fixa configurada. Chave fixa é `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, ou as variáveis do SDK `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_SECURITY_TOKEN`, `AWS_PROFILE`, `AWS_DEFAULT_PROFILE`, `AWS_SHARED_CREDENTIALS_FILE` e `AWS_CONFIG_FILE`, que `Settings` declara só para recusar. Os arquivos compartilhados que nenhuma variável aponta (`~/.aws/credentials`, `~/.aws/config`) o adaptador S3 não lê (005/T4, P3 e P4, 26/11/2026).
 - A validade da URL é fixa em 300 s, no domínio, porque a R3.2 fixa o valor. O `REPORT_URL_TTL_SECONDS` do rascunho anterior sai.
 - `.env.example`: o bloco S3 passa aos valores do laboratório, com `https://` (corrige a contradição com a R2.7).
 
@@ -243,6 +243,10 @@ Usa o `servicos-certs` e as redes `integracoes` e `exposicao` do design da 004 (
 
 - **Endereço público.** `s3.localhost` resolve para o próprio host nos navegadores. É um host, não um prefixo de caminho, porque o caminho entra na assinatura (D004-14). Com `SGS_HTTPS_PORT` diferente de 443, `SGS_PUBLIC_S3_URL` leva a porta (README).
 - **Criptografia no SeaweedFS.** Conferida na primeira hora da T8 (G1). Se a resposta do `PutObject` não trouxer `ServerSideEncryption: AES256`, a T8 para e a decisão volta ao dono antes de seguir. As opções são as da pergunta de 24/11/2026: outro armazenamento compatível, ou aceitar em dev só a conferência do checksum (a R2.8 em dev ficaria sem a parte da criptografia).
+- **Chave da SSE do laboratório (Decisão do Rafael, 26/11/2026).** Segredo em arquivo, gerado em `secrets/` como as outras chaves do laboratório (`src.tools.s3_sse_key` → `secrets/s3-security.toml`, com `[s3.sse] key`) e montado no `s3` como segredo em `/etc/seaweedfs/security.toml`, nunca como variável de ambiente. O `s3-init` também liga o versionamento do bucket (`weed shell`, `s3.bucket.versioning -enable`).
+- **Conferido na T8 (26/11/2026), já no compose.** O S3 só fala HTTPS na 8333 (HTTP recebe 400), e o objeto fica com `AES256`, o `ChecksumSHA256` enviado e uma `VersionId`, num bucket com versionamento `Enabled` (`tests/e2e/test_export_s3.py`). Dois ajustes que a T10 não pegou:
+  - o entrypoint da imagem troca para o usuário `seaweed` (uid 1000) com `su-exec`; com a chave do certificado `s3` de root (`0600`), o TLS trava no handshake sem nenhum erro no log. O `servicos-certs` passa a dar a chave ao uid 1000 e acerta o dono nos volumes antigos;
+  - com o `s3` em duas redes (`integracoes`, `exposicao`), o master anuncia o IP de uma delas, e o `s3-init`, só na `integracoes`, não o alcança: o `weed server` sobe com `-ip=s3 -ip.bind=0.0.0.0`.
 - **Roteiro (R6.3).** `docs/operacao/demo-relatorios.md`:
   1. pedir o relatório pelo `/docs`;
   2. acompanhar o status;
@@ -287,14 +291,44 @@ Usa o `servicos-certs` e as redes `integracoes` e `exposicao` do design da 004 (
 ## Riscos
 | Risco | Mitigação |
 |---|---|
-| SeaweedFS não aplicar ou não informar a SSE `AES256` | Primeira hora da T8; se faltar, decisão do dono antes de seguir (G1) |
-| Opções de TLS do S3 no `weed server` diferentes do esperado | Também na primeira hora da T8; a alternativa é o Caddy terminar o TLS interno, registrada aqui antes de seguir |
+| SeaweedFS não aplicar ou não informar a SSE `AES256` | Primeira hora da T8; se faltar, decisão do dono antes de seguir (G1). Conferido antes, na T10 (25/11/2026): aplica e informa, desde que a chave da SSE esteja configurada (abaixo) |
+| Opções de TLS do S3 no `weed server` diferentes do esperado | Também na primeira hora da T8; a alternativa é o Caddy terminar o TLS interno, registrada aqui antes de seguir. Conferido na T10: HTTPS direto na porta 8333 (abaixo) |
 | `moto` não devolver `ChecksumSHA256` ou `SSEKMSKeyId` no `PutObject` | Os testes da R2.8 usam evento do botocore (`after-call.s3.PutObject`) ou `Stubber`; a função de conferência é testada à parte |
 | Sem conta AWS, o caminho de `prod` só é provado com `moto`, a R2.9 e o documento da T7 | Aceito no G1; tarefa opcional se houver conta |
 | Exportação grande da trilha (dois anos de eventos) | Cursor do servidor, arquivo em disco e limite de linhas; o período máximo é 366 dias (R1.5) |
 | URL vazada por log ou histórico | 5 minutos, `no-store`, nunca registrada; o nome do arquivo não traz dado pessoal |
 | Uma instância só da API | É o desenho do projeto; mais de uma exige fila |
 | Ordem com a 004 no compose (`servicos-certs`, redes) | A primeira T8 cria as peças compartilhadas com os três nomes; a outra só acrescenta o seu serviço |
+
+### Conferência antecipada do SeaweedFS (005/T10, 25/11/2026)
+Feita por agente fora do repositório, num contêiner descartável, com o `boto3` 1.43.127 do projeto e um certificado de uma CA de teste. Nenhuma decisão muda. **Resultado: a SSE `AES256` é aplicada e informada, e a frente C segue.**
+
+- **Imagem.** `chrislusf/seaweedfs:4.53` (`weed version`: `30GB 4.53 4ab66fb76`), publicada em 08/11/2026, digest `sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0`. É a tag que a T8 fixa.
+- **Comando** (a chave da SSE vem por `--env-file`; o `s3.json` traz uma identidade de teste):
+
+  ```bash
+  docker run -d --env-file sse.env -p 127.0.0.1:18443:8333 -v <dir>:/conf:ro,Z chrislusf/seaweedfs:4.53 \
+    server -dir=/data -s3 -s3.port=8333 -s3.config=/conf/s3.json \
+    -s3.cert.file=/conf/certs/s3.crt -s3.key.file=/conf/certs/s3.key
+  ```
+
+- **TLS.** Com `-s3.cert.file` e `-s3.key.file`, a porta de `-s3.port` (8333) serve só HTTPS (log: `Start Seaweed S3 API Server ... at https port 8333`). HTTP nessa porta recebe 400 (`Client sent an HTTP request to an HTTPS server`). O `-s3.port.https` (porta HTTPS à parte) não foi preciso, e a T8 não precisa dele. `-s3.cacert.file` e `-s3.tlsVerifyClientCert` são de mTLS, fora do plano. O `boto3` conferiu o certificado com `verify=<ca.crt>`, e sem a CA recusou (`SSLError`). Bate com o desenho: o Caddy faz `reverse_proxy https://s3:8333` com `tls_server_name s3`, e o TLS fica no próprio SeaweedFS.
+- **A SSE depende de uma chave configurada.** Sem `s3.sse.kek` ou `s3.sse.key` (`security.toml`), ou `WEED_S3_SSE_KEK` ou `WEED_S3_SSE_KEY` (ambiente), o log avisa `SSE-S3 encryption is disabled`, e o `PutObject` com `ServerSideEncryption="AES256"` recebe **500 `InternalError`** sem gravar o objeto. A falha é fechada: nada fica gravado em claro. Com `WEED_S3_SSE_KEY` (texto secreto do qual o SeaweedFS deriva a chave de 256 bits por HKDF-SHA256), a SSE funciona.
+- **`PutObject`** com `ServerSideEncryption="AES256"`, `ChecksumSHA256` e `Config(signature_version="s3v4", request_checksum_calculation="when_required", response_checksum_validation="when_required", s3={"addressing_style": "path"})`: 200, com `ServerSideEncryption: AES256`, o `ChecksumSHA256` igual ao enviado e `VersionId`. Sem `SSEKMSKeyId`, como se espera em `AES256`. A `Config` com `when_required` funciona.
+- **`HeadObject` e `GetObject`.** Trazem `ServerSideEncryption: AES256` e `VersionId`. O `ChecksumSHA256` só volta com `ChecksumMode="ENABLED"`. O conteúdo baixado tem o mesmo SHA-256 do enviado.
+- **Checksum errado.** 400 `BadDigest`, sem gravar.
+- **Sem o cabeçalho de SSE.** 200 sem `ServerSideEncryption`: o bucket não cifra por padrão. A API sempre manda o cabeçalho, e o `conferir_gravacao` pega a ausência.
+- **Em disco.** Num objeto aleatório com um marcador no meio, o marcador aparece no `.dat` do volume quando o objeto vai sem SSE e não aparece quando vai com `AES256`.
+- **Versionamento.** `PutBucketVersioning` com `Enabled` é aceito. `DeleteObject` com o `VersionId` responde 204 e não deixa versão nem *delete marker*: a remoção pela versão (R2.8) funciona.
+- **URL pré-assinada** (SigV4, 300 s, `ResponseContentDisposition`): traz `X-Amz-Expires=300`, e o GET responde 200 com o `Content-Disposition` pedido, `x-amz-server-side-encryption: AES256` e o mesmo SHA-256.
+- **Para a T8** (observações, sem mudar decisão):
+  - a chave da SSE do laboratório é uma peça que § Ambiente de demonstração não lista. Sem ela, todo envio recebe 500. Como entra no compose (segredo montado ou variável) fica com os donos, junto com a T8;
+  - o versionamento do bucket também tem de ser ligado no `s3-init`, além de criar o bucket. Aqui foi pelo `PutBucketVersioning`;
+  - a 4.53 sobe também o Iceberg REST (8181) e o Lance (9101) em HTTP; `-s3.port.iceberg=0` e `-s3.port.lance=0` desligam os dois;
+  - a telemetria vem ligada (`-master.telemetry=false` desliga);
+  - o log avisa que, sem `WEED_S3_SSE_KEK_PASSPHRASE`, a KEK fica no *filer* sem cifra;
+  - a identidade de teste tinha `Admin`, para criar o bucket e ligar o versionamento. A da T8 fica com `Read`, `Write` e `List`, como no design;
+  - no Fedora, com SELinux, as montagens levam `:Z`.
 
 ## Estratégia de testes
 Todo teste cita o critério na docstring (`"""005/R2.8"""`). Sem internet: STS e S3 por `moto` (`mock_aws`).

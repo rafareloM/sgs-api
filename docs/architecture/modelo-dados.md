@@ -4,7 +4,7 @@
 
 ## 1. Identidade e acesso
 
-> **Ainda não implementadas:** `groups`, `user_groups` e `directory_sync_runs` nascem na spec 004 (T1), em Rascunho. `group_role_mappings` já existe, mas sem FK em `group_id` até lá. O banco real está em [`docs/banco/04-dicionario-dados.md`](../banco/04-dicionario-dados.md).
+> `groups`, `user_groups`, `directory_sync_runs` e `oidc_login_requests` vêm da migração `0004_diretorio` (spec 004, T1), que também liga `group_role_mappings.group_id` a `groups.id` (`ON DELETE RESTRICT`). O banco real está em [`docs/banco/04-dicionario-dados.md`](../banco/04-dicionario-dados.md).
 
 ```mermaid
 erDiagram
@@ -24,8 +24,8 @@ erDiagram
 | Tabela | Colunas principais | Observações |
 |---|---|---|
 | `users` | `id`, `username` (único, minúsculo), `email` (único, minúsculo, opcional), `display_name`, `password_hash` (Argon2id; nulo se externo), `source` (`local`/`ldap`/`oidc`), `external_id` (DN ou `sub`; nulo se local), `is_active`, `mfa_enabled`, `mfa_secret_enc`, `mfa_last_step`, `mfa_challenge_jti`, `mfa_failed_attempts`, `failed_logins`, `locked_until`, `last_login_at`, `synced_at`, `authz_version` | Único em (`source`, `external_id`). Nunca é apagado, só desativado. `mfa_last_step` impede reusar o código TOTP (R2.4); `mfa_challenge_jti` e `mfa_failed_attempts` contam os erros por `mfa_token` (R2.6); `authz_version` sobe a cada alteração das atribuições e invalida o cache de permissões (003/R4.5) |
-| `groups` | `id`, `name`, `source`, `external_id`, `description`, `is_active`, `synced_at` | Único em (`source`, `external_id`) |
-| `user_groups` | `user_id`, `group_id`, `source` | PK composta |
+| `groups` | `id`, `name`, `source` (`ldap`/`oidc`), `external_id`, `description`, `is_active`, `synced_at` | Único em (`source`, `external_id`). Nunca é apagado, só desativado |
+| `user_groups` | `user_id`, `group_id`, `source` (`ldap`/`oidc`), `created_at` | PK composta; índice em `group_id` |
 | `roles` | `id`, `code` (ex.: `GESTOR_UNIDADE`), `name`, `description`, `is_system` | Seed por migração |
 | `permissions` | `id`, `code` (`recurso:acao`), `description` | Seed por migração |
 | `role_permissions` | `role_id`, `permission_id`, `max_scope` (`global`/`area`/`distrito`/`unidade`) | `max_scope` limita o escopo com que o papel pode exercer a permissão |
@@ -33,7 +33,8 @@ erDiagram
 | `group_role_mappings` | `id`, `group_id`, `role_id`, `scope_type`, `scope_id`, `created_by` | Configuração feita pelo Admin TI |
 | `sessions` | `id`, `user_id`, `amr` (`pwd+otp`/`ldap+otp`/`oidc`), `ip`, `user_agent`, `created_at`, `revoked_at` | `sid` no JWT |
 | `refresh_tokens` | `id`, `session_id`, `token_hash` (SHA-256), `family_id`, `expires_at`, `used_at`, `revoked_at` | Rotação e detecção de reuso |
-| `directory_sync_runs` | `id`, `kind` (`ldap`), `status`, `started_at`, `finished_at`, `triggered_by`, `users_created/updated/deactivated`, `groups_*`, `errors` (JSONB) | Histórico da sincronização |
+| `directory_sync_runs` | `id`, `kind` (`ldap`), `status`, `started_at`, `finished_at`, `triggered_by`, `users_created/updated/deactivated`, `groups_*`, `conflicts` (JSONB, lista), `error` (genérico) | Histórico da sincronização; uma execução `em_andamento` por vez (`ux_directory_sync_runs_em_andamento`) |
+| `oidc_login_requests` | `id`, `state_hash` e `binding_hash` (SHA-256), `nonce`, `code_verifier_enc` (`FieldCipher`), `created_at`, `expires_at`, `used_at` | `state` de uso único (004/R3.7); único em `state_hash` |
 
 ## 2. Cadastro governado
 
@@ -84,7 +85,7 @@ Como o vínculo do serviço guarda `unit_id` (e não o nome da unidade), o probl
 
 | Tabela | Colunas | Observações |
 |---|---|---|
-| `report_jobs` | `id`, `report_type` (`inventario_unidades`/`trilha_auditoria`), `format` (`csv`/`xlsx`), `filters` (JSONB), `requested_by`, `scope_snapshot` (JSONB), `status` (`pendente`/`gerando`/`concluido`/`falhou`), `storage_bucket`, `storage_key`, `size_bytes`, `sha256`, `error`, `created_at`, `finished_at`, `expires_at` | `scope_snapshot` registra com que escopo o relatório foi gerado |
+| `report_jobs` | `id`, `report_type` (`inventario_unidades`/`trilha_auditoria`), `format` (`csv`/`xlsx`), `filters` (JSONB), `requested_by`, `scope_snapshot` (JSONB), `status` (`pendente`/`gerando`/`concluido`/`falhou`), `storage_bucket`, `storage_key`, `storage_version_id`, `size_bytes`, `sha256` (hex), `signature`, `signature_alg`, `signature_kid`, `error` (até 200), `created_at`, `updated_at`, `started_at`, `finished_at`, `expires_at` | Migração `0005_relatorios` (spec 005). `scope_snapshot` registra com que escopo o relatório foi gerado (R1.3). `storage_version_id` permite remover exatamente o objeto gravado (R2.8). Assinatura, algoritmo e `kid` do hash (R5.1). `CHECK`: `concluido` exige `storage_key`, `sha256` e a assinatura completa. Índices: `(requested_by, created_at DESC)` e parcial em `status` para `pendente`/`gerando` |
 
 ## 5. Criptografia de campos
 

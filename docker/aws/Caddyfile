@@ -1,0 +1,33 @@
+# Proxy do laboratório na AWS (spec 005, T13). Mesmo papel do docker/caddy/Caddyfile, com duas
+# diferenças: os nomes são os do IP elástico em sslip.io (SGS_LAB_HOST, por exemplo
+# 203-0-113-10.sslip.io) e os certificados vêm do Let's Encrypt (desafio HTTP-01 na porta 80,
+# a única aberta a todos no grupo de segurança). Não há bloco do S3: o bucket é o da AWS.
+# O X-Forwarded-For segue a regra local (spec 013, T4): o Caddy escreve o IP da conexão.
+{$SGS_LAB_HOST} {
+	@api path /api/* /health/* /.well-known/*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/frontend
+		header {
+			# 'unsafe-inline' em style-src é exceção temporária (design da 012 § Entrega pelo Caddy).
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+		}
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Keycloak de laboratório num host próprio (spec 004, D004-14), conferido pela CA de laboratório.
+keycloak.{$SGS_LAB_HOST} {
+	reverse_proxy https://keycloak:8443 {
+		transport http {
+			tls_trust_pool file /certs-servicos/ca.crt
+			tls_server_name keycloak
+		}
+	}
+}

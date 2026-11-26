@@ -13,7 +13,7 @@ from src.modules.identity.domain.login import (
     EstadoDeLogin,
 )
 from src.modules.identity.domain.sessions import AuthSession, RefreshToken
-from src.modules.identity.domain.users import User, normalize_username
+from src.modules.identity.domain.users import User, UserSource, normalize_username
 from src.modules.identity.infrastructure.tables import refresh_tokens, sessions, users
 
 # Só as colunas que o `User` conhece; o segredo TOTP fica de fora até a T5.
@@ -73,6 +73,22 @@ class SqlUserRepository:
     async def get_by_username(self, username: str) -> User | None:
         result = await self._session.execute(
             select(*_USER_COLUMNS).where(users.c.username == normalize_username(username))
+        )
+        row = result.mappings().one_or_none()
+        return None if row is None else User(**row)
+
+    async def get_by_email(self, email: str) -> User | None:
+        result = await self._session.execute(
+            select(*_USER_COLUMNS).where(users.c.email == email.strip().lower())
+        )
+        row = result.mappings().one_or_none()
+        return None if row is None else User(**row)
+
+    async def get_by_external_id(self, source: UserSource, external_id: str) -> User | None:
+        result = await self._session.execute(
+            select(*_USER_COLUMNS).where(
+                users.c.source == source.value, users.c.external_id == external_id
+            )
         )
         row = result.mappings().one_or_none()
         return None if row is None else User(**row)

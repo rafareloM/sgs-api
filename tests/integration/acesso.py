@@ -6,10 +6,11 @@ Os dados entram pelo login da API (papel `sgs_app`), como faria a aplicação; o
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import FastAPI
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
 
 from src.core.ids import uuid7
 from src.modules.identity.domain.sessions import AuthSession
@@ -37,6 +38,19 @@ async def id_pelo_codigo(sessoes: Sessoes, referencia: str, codigo: str) -> int:
     if id_ is None:
         raise LookupError(f"{referencia} {codigo!r} não semeado")
     return int(id_)
+
+
+async def grupo_espelhado(conexao: AsyncConnection | AsyncSession) -> UUID:
+    """Grupo LDAP ativo em `groups`, para os mapeamentos de grupo (FK da 0004_diretorio)."""
+    grupo = uuid7()
+    await conexao.execute(
+        text(
+            "INSERT INTO groups (id, source, external_id, name)"
+            " VALUES (:id, 'ldap', :external_id, 'Grupo de teste')"
+        ),
+        {"id": grupo, "external_id": f"cn={grupo.hex},ou=grupos"},
+    )
+    return grupo
 
 
 async def logado(sessoes: Sessoes, *atribuicoes: Atribuicao) -> AuthSession:

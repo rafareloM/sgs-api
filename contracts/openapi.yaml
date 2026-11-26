@@ -74,13 +74,34 @@
         }
       }
     },
+    "/.well-known/relatorios-jwks.json": {
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Chaves públicas de verificação dos relatórios exportados",
+        "operationId": "relatorios_jwks__well_known_relatorios_jwks_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JwksDeRelatorios"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
           "autenticação"
         ],
         "summary": "Login com usuário e senha",
-        "description": "R1: responde o desafio do 2FA (`mfa_required` ou `mfa_enrollment_required`).",
+        "description": "R1: responde o desafio do 2FA (`mfa_required` ou `mfa_enrollment_required`). Com\n`provider = \"ldap\"`, a senha é conferida no diretório (spec 004, R2).",
         "operationId": "entrar_api_v1_auth_login_post",
         "requestBody": {
           "content": {
@@ -111,6 +132,12 @@
           },
           "429": {
             "description": "Limite de 10 tentativas por minuto por IP",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Diretório LDAP indisponível (spec 004)",
             "content": {
               "application/problem+json": {}
             }
@@ -392,6 +419,152 @@
         ]
       }
     },
+    "/api/v1/auth/provedores": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Origens de login ligadas",
+        "description": "R3.9: a tela de login mostra a entrada OIDC só com o OIDC ligado.",
+        "operationId": "provedores_api_v1_auth_provedores_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvedoresOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oidc/login": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Começar o login pelo provedor de identidade",
+        "description": "R3.1, R3.8: Authorization Code com PKCE S256, `state` e `nonce`; o `redirect_uri` vem da\nconfiguração.",
+        "operationId": "login_oidc_api_v1_auth_oidc_login_get",
+        "responses": {
+          "302": {
+            "description": "Para o provedor, com o cookie de vínculo `sgs_oidc`"
+          },
+          "404": {
+            "description": "OIDC não configurado",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "429": {
+            "description": "Limite de 20 por minuto por IP",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Provedor indisponível",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oidc/callback": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Retorno do provedor de identidade",
+        "description": "R3.2 a R3.7, R4.3, R4.4: sempre 302, nunca JSON.",
+        "operationId": "callback_oidc_api_v1_auth_oidc_callback_get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "name": "sgs_oidc",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sgs Oidc"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Para o front, com a sessão ou com `login_erro=oidc`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -637,6 +810,494 @@
           },
           "404": {
             "description": "Atribuição inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/mapeamentos-grupo": {
+      "get": {
+        "tags": [
+          "acesso"
+        ],
+        "summary": "Mapeamentos grupo→papel",
+        "description": "003/R3: os mapeamentos, na ordem de criação.",
+        "operationId": "listar_mapeamentos_api_v1_admin_mapeamentos_grupo_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MapeamentoOut"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Mapeamentos Api V1 Admin Mapeamentos Grupo Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `papel:assign`, ou atribuição a si mesmo (segregação de funções)",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "acesso"
+        ],
+        "summary": "Mapear grupo do diretório para papel",
+        "description": "003/R3.1: os membros ativos do grupo recebem o papel (origem `group`), que vale na\npróxima requisição deles (R4.5); audita `mapeamento.criado` e cada `papel.atribuido`.",
+        "operationId": "mapear_api_v1_admin_mapeamentos_grupo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapeamentoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapeamentoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `papel:assign`, ou mapeamento de grupo de que se é membro (segregação de funções)",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "409": {
+            "description": "O grupo já está mapeado para este papel neste escopo",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Papel ou escopo inválidos",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/mapeamentos-grupo/{id_}": {
+      "delete": {
+        "tags": [
+          "acesso"
+        ],
+        "summary": "Remover mapeamento grupo→papel",
+        "description": "003/R3.2, R3.3: saem as atribuições derivadas do mapeamento (cada uma auditada como\n`papel.removido`); as diretas ficam. Audita `mapeamento.removido`.",
+        "operationId": "remover_mapeamento_api_v1_admin_mapeamentos_grupo__id___delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `papel:assign`, ou atribuição a si mesmo (segregação de funções)",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "404": {
+            "description": "Mapeamento inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/diretorio/sincronizar": {
+      "post": {
+        "tags": [
+          "diretório"
+        ],
+        "summary": "Disparar a sincronização do diretório LDAP",
+        "description": "R1.1, R1.11: 202 com o id; a execução segue em segundo plano e é consultada nas\nexecuções. Audita `diretorio.sincronizado` ao terminar, com quem disparou como ator.",
+        "operationId": "disparar_api_v1_admin_diretorio_sincronizar_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecucaoIniciadaOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `diretorio:sync`",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "409": {
+            "description": "Já há uma sincronização em andamento",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "LDAP não configurado",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/diretorio/execucoes": {
+      "get": {
+        "tags": [
+          "diretório"
+        ],
+        "summary": "Execuções da sincronização",
+        "description": "R1.9: da mais recente para a mais antiga.",
+        "operationId": "execucoes_api_v1_admin_diretorio_execucoes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "description": "Página, a partir de 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página, a partir de 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (padrão 20, máximo 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (padrão 20, máximo 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaOut_ExecucaoOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `diretorio:sync`",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/diretorio/execucoes/{id_}": {
+      "get": {
+        "tags": [
+          "diretório"
+        ],
+        "summary": "Uma execução da sincronização",
+        "description": "R1.9, R1.10, R4.2: contagens, conflitos e o erro genérico.",
+        "operationId": "execucao_api_v1_admin_diretorio_execucoes__id___get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecucaoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `diretorio:sync`",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "404": {
+            "description": "Execução inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/diretorio/grupos": {
+      "get": {
+        "tags": [
+          "diretório"
+        ],
+        "summary": "Grupos espelhados do diretório",
+        "description": "R1.14: id, origem, nome e membros com conta ativa, para o mapeamento da 003 (R3.1).",
+        "operationId": "grupos_api_v1_admin_diretorio_grupos_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "origem",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ldap",
+                    "oidc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origem"
+            }
+          },
+          {
+            "name": "ativo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Ativo"
+            }
+          },
+          {
+            "name": "busca",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Trecho do nome.",
+              "title": "Busca"
+            },
+            "description": "Trecho do nome."
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "description": "Página, a partir de 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página, a partir de 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (padrão 20, máximo 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (padrão 20, máximo 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaOut_GrupoOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `papel:assign`",
             "content": {
               "application/problem+json": {}
             }
@@ -4351,6 +5012,321 @@
           }
         ]
       }
+    },
+    "/api/v1/relatorios": {
+      "post": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Pedir um relatório",
+        "description": "R1.1 a R1.5: 202 com o id; a geração segue em segundo plano. `inventario_unidades` exige\n`unidade:read`; `trilha_auditoria`, `auditoria:read`.",
+        "operationId": "pedir_api_v1_relatorios_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/PedidoDoInventarioIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PedidoDaTrilhaIn"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "tipo",
+                  "mapping": {
+                    "inventario_unidades": "#/components/schemas/PedidoDoInventarioIn",
+                    "trilha_auditoria": "#/components/schemas/PedidoDaTrilhaIn"
+                  }
+                },
+                "title": "Corpo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PedidoCriadoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `relatorio:export` ou sem a permissão de dados do tipo",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Tipo, formato ou filtros inválidos",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Exportação não configurada (sem `S3_BUCKET`)",
+            "content": {
+              "application/problem+json": {}
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Relatórios pedidos",
+        "description": "R3.5: do mais recente ao mais antigo; os do usuário, ou todos para `GESTOR_DADOS`.",
+        "operationId": "listar_api_v1_relatorios_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StatusDoPedido"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "description": "Página, a partir de 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página, a partir de 1."
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página (padrão 20, máximo 100).",
+              "default": 20,
+              "title": "Tamanho"
+            },
+            "description": "Itens por página (padrão 20, máximo 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaOut_RelatorioOut_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `relatorio:export`",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/relatorios/{id_}": {
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "Um relatório",
+        "description": "R3.1, R3.3, R5.3: status, e `integridade` quando concluído.",
+        "operationId": "consultar_api_v1_relatorios__id___get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatorioOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Nem quem pediu, nem escopo que cubra o do pedido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "404": {
+            "description": "Relatório inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/relatorios/{id_}/download": {
+      "get": {
+        "tags": [
+          "relatórios"
+        ],
+        "summary": "URL de download de um relatório",
+        "description": "R3.2 a R3.4, R3.6: 200 com a URL de 5 minutos no endereço público; `no-store`.",
+        "operationId": "baixar_api_v1_relatorios__id___download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem access token válido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "403": {
+            "description": "Sem `relatorio:download`, ou nem quem pediu nem escopo que cubra",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "404": {
+            "description": "Relatório inexistente",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "409": {
+            "description": "Relatório não concluído ou vencido",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "503": {
+            "description": "Exportação não configurada (sem `S3_BUCKET`)",
+            "content": {
+              "application/problem+json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4801,6 +5777,65 @@
         "title": "ConciliacaoOut",
         "description": "Linha da conciliação unidade x equipamento; o lado que faltar vem nulo. `distrito` é o\nnome do distrito da unidade e `equipamento_tipo`, o nome do tipo do equipamento."
       },
+      "ConflitoOut": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "email",
+              "username"
+            ],
+            "title": "Tipo"
+          },
+          "external_id": {
+            "type": "string",
+            "title": "External Id"
+          },
+          "usuario_existente_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Existente Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "external_id",
+          "usuario_existente_id"
+        ],
+        "title": "ConflitoOut",
+        "description": "Sem e-mail nem nome: o Admin TI chega à conta pelo id (LGPD)."
+      },
+      "ContagensOut": {
+        "properties": {
+          "criados": {
+            "type": "integer",
+            "title": "Criados"
+          },
+          "atualizados": {
+            "type": "integer",
+            "title": "Atualizados"
+          },
+          "desativados": {
+            "type": "integer",
+            "title": "Desativados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "criados",
+          "atualizados",
+          "desativados"
+        ],
+        "title": "ContagensOut"
+      },
       "DesativacaoIn": {
         "properties": {
           "motivo": {
@@ -4855,6 +5890,26 @@
           "network_percent_without_cnes"
         ],
         "title": "DistritoSemCnesOut"
+      },
+      "DownloadOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expira_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expira Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expira_em"
+        ],
+        "title": "DownloadOut",
+        "description": "D005-1: a URL pré-assinada é uma credencial de 5 minutos (`no-store`)."
       },
       "EnrollOut": {
         "properties": {
@@ -5486,6 +6541,275 @@
         "title": "EventoOut",
         "description": "Um evento da trilha (008/R1.2, R2.1)."
       },
+      "ExecucaoIniciadaOut": {
+        "properties": {
+          "execucao_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Execucao Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "em_andamento",
+            "title": "Status",
+            "default": "em_andamento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execucao_id"
+        ],
+        "title": "ExecucaoIniciadaOut"
+      },
+      "ExecucaoOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "const": "ldap",
+            "title": "Tipo"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "em_andamento",
+              "concluida",
+              "falhou"
+            ],
+            "title": "Status"
+          },
+          "iniciada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Iniciada Em"
+          },
+          "concluida_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concluida Em"
+          },
+          "disparada_por": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disparada Por"
+          },
+          "usuarios": {
+            "$ref": "#/components/schemas/ContagensOut"
+          },
+          "grupos": {
+            "$ref": "#/components/schemas/ContagensOut"
+          },
+          "conflitos": {
+            "items": {
+              "$ref": "#/components/schemas/ConflitoOut"
+            },
+            "type": "array",
+            "title": "Conflitos"
+          },
+          "erro": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "status",
+          "iniciada_em",
+          "concluida_em",
+          "disparada_por",
+          "usuarios",
+          "grupos",
+          "conflitos",
+          "erro"
+        ],
+        "title": "ExecucaoOut"
+      },
+      "FiltrosDaTrilha": {
+        "properties": {
+          "de": {
+            "type": "string",
+            "format": "date-time",
+            "title": "De"
+          },
+          "ate": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ate"
+          },
+          "acao": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "pattern": "^[a-z][a-z0-9_.]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acao",
+            "description": "Prefixo da ação."
+          },
+          "entidade_tipo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entidade Tipo"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "de",
+          "ate"
+        ],
+        "title": "FiltrosDaTrilha",
+        "description": "Filtros de `trilha_auditoria`: período obrigatório de até 366 dias (R1.5), prefixo da\nação e tipo de entidade.\n\n- `de` incluído e `ate` excluído, como as consultas da auditoria (`occurred_at < :ate`).\n- Data e hora com fuso: sem ele, o instante dependeria do fuso da sessão do banco."
+      },
+      "FiltrosDoInventario": {
+        "properties": {
+          "distrito_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32767.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distrito Id"
+          },
+          "area_tecnica_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32767.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Tecnica Id"
+          },
+          "tipo_unidade_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32767.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Unidade Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ativa",
+                  "inativa",
+                  "em_implantacao"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FiltrosDoInventario",
+        "description": "Filtros de `inventario_unidades` (`vw_unit_inventory`), todos opcionais."
+      },
+      "FormatoDeRelatorio": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "xlsx"
+        ],
+        "title": "FormatoDeRelatorio",
+        "description": "R1.2."
+      },
+      "GrupoOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "origem": {
+            "type": "string",
+            "enum": [
+              "ldap",
+              "oidc"
+            ],
+            "title": "Origem"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "membros_ativos": {
+            "type": "integer",
+            "title": "Membros Ativos"
+          },
+          "ativo": {
+            "type": "boolean",
+            "title": "Ativo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "origem",
+          "nome",
+          "membros_ativos",
+          "ativo"
+        ],
+        "title": "GrupoOut"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -5512,6 +6836,35 @@
           "status"
         ],
         "title": "HealthStatus"
+      },
+      "IntegridadeOut": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "assinatura": {
+            "type": "string",
+            "title": "Assinatura"
+          },
+          "algoritmo": {
+            "type": "string",
+            "title": "Algoritmo"
+          },
+          "kid": {
+            "type": "string",
+            "title": "Kid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "assinatura",
+          "algoritmo",
+          "kid"
+        ],
+        "title": "IntegridadeOut",
+        "description": "R5.3: o hash do arquivo e a assinatura, para conferir fora da API (R5.4)."
       },
       "InventarioOut": {
         "properties": {
@@ -5667,6 +7020,50 @@
         "title": "Jwk",
         "description": "Chave pública EC P-256 no formato JWK (RFC 7517 e 7518)."
       },
+      "JwkDeRelatorio": {
+        "properties": {
+          "kty": {
+            "type": "string",
+            "title": "Kty"
+          },
+          "crv": {
+            "type": "string",
+            "title": "Crv"
+          },
+          "alg": {
+            "type": "string",
+            "title": "Alg"
+          },
+          "use": {
+            "type": "string",
+            "title": "Use"
+          },
+          "kid": {
+            "type": "string",
+            "title": "Kid"
+          },
+          "x": {
+            "type": "string",
+            "title": "X"
+          },
+          "y": {
+            "type": "string",
+            "title": "Y"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "alg",
+          "use",
+          "kid",
+          "x",
+          "y"
+        ],
+        "title": "JwkDeRelatorio",
+        "description": "Chave pública EC P-256 no formato JWK (RFC 7517 e 7518)."
+      },
       "Jwks": {
         "properties": {
           "keys": {
@@ -5683,6 +7080,22 @@
         ],
         "title": "Jwks"
       },
+      "JwksDeRelatorios": {
+        "properties": {
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/JwkDeRelatorio"
+            },
+            "type": "array",
+            "title": "Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "title": "JwksDeRelatorios"
+      },
       "LoginIn": {
         "properties": {
           "username": {
@@ -5696,6 +7109,16 @@
             "maxLength": 256,
             "minLength": 1,
             "title": "Password"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "ldap"
+            ],
+            "title": "Provider",
+            "description": "`ldap` confere a senha no diretório (spec 004, R2).",
+            "default": "local"
           }
         },
         "additionalProperties": false,
@@ -5758,6 +7181,101 @@
           "mfa_enrollment_required"
         ],
         "title": "LoginOut"
+      },
+      "MapeamentoIn": {
+        "properties": {
+          "grupo_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Grupo Id",
+            "description": "Id do grupo do diretório (spec 004)."
+          },
+          "papel": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Papel"
+          },
+          "escopo_tipo": {
+            "type": "string",
+            "enum": [
+              "global",
+              "area",
+              "distrito",
+              "unidade"
+            ],
+            "title": "Escopo Tipo"
+          },
+          "escopo_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escopo Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "grupo_id",
+          "papel",
+          "escopo_tipo"
+        ],
+        "title": "MapeamentoIn",
+        "description": "003/R3.1: o grupo do diretório, o papel e o escopo exigido pelo papel (R2.1)."
+      },
+      "MapeamentoOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "grupo_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Grupo Id"
+          },
+          "papel": {
+            "type": "string",
+            "title": "Papel"
+          },
+          "escopo_tipo": {
+            "type": "string",
+            "title": "Escopo Tipo"
+          },
+          "escopo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escopo Id"
+          },
+          "criado_por": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Criado Por"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "grupo_id",
+          "papel",
+          "escopo_tipo",
+          "escopo_id",
+          "criado_por"
+        ],
+        "title": "MapeamentoOut"
       },
       "MeOut": {
         "properties": {
@@ -5955,6 +7473,68 @@
         ],
         "title": "PaginaOut[EventoOut]"
       },
+      "PaginaOut_ExecucaoOut_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/ExecucaoOut"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho"
+        ],
+        "title": "PaginaOut[ExecucaoOut]"
+      },
+      "PaginaOut_GrupoOut_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/GrupoOut"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho"
+        ],
+        "title": "PaginaOut[GrupoOut]"
+      },
       "PaginaOut_InventarioOut_": {
         "properties": {
           "itens": {
@@ -6016,6 +7596,37 @@
           "tamanho"
         ],
         "title": "PaginaOut[RegistroDoBancoOut]"
+      },
+      "PaginaOut_RelatorioOut_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/RelatorioOut"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho"
+        ],
+        "title": "PaginaOut[RelatorioOut]"
       },
       "PaginaOut_UnidadeForaDoCnesOut_": {
         "properties": {
@@ -6160,6 +7771,100 @@
           "linhas"
         ],
         "title": "ParticaoOut"
+      },
+      "PedidoCriadoOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "pendente",
+            "title": "Status",
+            "default": "pendente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PedidoCriadoOut"
+      },
+      "PedidoDaTrilhaIn": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "trilha_auditoria",
+            "title": "Tipo"
+          },
+          "formato": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Formato"
+          },
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosDaTrilha"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tipo",
+          "formato",
+          "filtros"
+        ],
+        "title": "PedidoDaTrilhaIn"
+      },
+      "PedidoDoInventarioIn": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "const": "inventario_unidades",
+            "title": "Tipo"
+          },
+          "formato": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Formato"
+          },
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosDoInventario",
+            "default": {}
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tipo",
+          "formato"
+        ],
+        "title": "PedidoDoInventarioIn"
+      },
+      "ProvedoresOut": {
+        "properties": {
+          "ldap": {
+            "type": "boolean",
+            "title": "Ldap"
+          },
+          "oidc": {
+            "type": "boolean",
+            "title": "Oidc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ldap",
+          "oidc"
+        ],
+        "title": "ProvedoresOut"
       },
       "QualidadeOut": {
         "properties": {
@@ -6377,6 +8082,116 @@
           "pela_api"
         ],
         "title": "RegistroDoBancoOut"
+      },
+      "RelatorioOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoDeRelatorio"
+          },
+          "formato": {
+            "$ref": "#/components/schemas/FormatoDeRelatorio"
+          },
+          "filtros": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filtros"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusDoPedido"
+          },
+          "solicitado_por": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Solicitado Por"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          },
+          "concluido_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concluido Em"
+          },
+          "tamanho_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tamanho Bytes"
+          },
+          "vence_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vence Em"
+          },
+          "vencido": {
+            "type": "boolean",
+            "title": "Vencido"
+          },
+          "erro": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erro"
+          },
+          "integridade": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntegridadeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "formato",
+          "filtros",
+          "status",
+          "solicitado_por",
+          "criado_em",
+          "concluido_em",
+          "tamanho_bytes",
+          "vence_em",
+          "vencido",
+          "erro",
+          "integridade"
+        ],
+        "title": "RelatorioOut"
       },
       "ResumoOut": {
         "properties": {
@@ -6608,6 +8423,17 @@
         "title": "SituacaoConciliacao",
         "description": "Lado da conciliação unidade x equipamento em que a linha caiu (011/R2.2)."
       },
+      "StatusDoPedido": {
+        "type": "string",
+        "enum": [
+          "pendente",
+          "gerando",
+          "concluido",
+          "falhou"
+        ],
+        "title": "StatusDoPedido",
+        "description": "R1.1, R2.5, R2.6."
+      },
       "TipoDeReferencia": {
         "type": "string",
         "enum": [
@@ -6619,6 +8445,15 @@
         ],
         "title": "TipoDeReferencia",
         "description": "As referências expostas em `/referencias/{tipo}` (006/R7.1), com o nome da tabela."
+      },
+      "TipoDeRelatorio": {
+        "type": "string",
+        "enum": [
+          "inventario_unidades",
+          "trilha_auditoria"
+        ],
+        "title": "TipoDeRelatorio",
+        "description": "R1.2."
       },
       "TokenOut": {
         "properties": {

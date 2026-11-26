@@ -29,7 +29,19 @@ MAPA: dict[str, Esperado] = {
     "POST /api/v1/auth/logout": Esperado("auth.logout", "usuario"),
     "POST /api/v1/admin/atribuicoes": Esperado("papel.atribuido", "usuario"),
     "DELETE /api/v1/admin/atribuicoes/{id_}": Esperado("papel.removido", "usuario"),
+    # O grupo do teste não tem membros, então o mapeamento só grava o próprio evento, sem
+    # `papel.atribuido` ou `papel.removido` de derivadas (003/T8).
+    "POST /api/v1/admin/mapeamentos-grupo": Esperado("mapeamento.criado", "mapeamento_grupo"),
+    "DELETE /api/v1/admin/mapeamentos-grupo/{id_}": Esperado(
+        "mapeamento.removido", "mapeamento_grupo"
+    ),
+    # A execução roda em segundo plano, com quem disparou como ator (004/T4).
+    "POST /api/v1/admin/diretorio/sincronizar": Esperado(
+        "diretorio.sincronizado", "execucao_diretorio"
+    ),
     "POST /api/v1/unidades": Esperado("unidade.criada", "unidade"),
+    # A geração em segundo plano audita `relatorio.exportado` depois; o fato da rota é o pedido.
+    "POST /api/v1/relatorios": Esperado("relatorio.solicitado", "relatorio"),
     "PATCH /api/v1/unidades/{id}": Esperado("unidade.atualizada", "unidade"),
     "POST /api/v1/unidades/{id}/desativar": Esperado("unidade.desativada", "unidade"),
     "POST /api/v1/unidades/{id}/equipamentos": Esperado(

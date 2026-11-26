@@ -33,6 +33,13 @@ subcomando de primeiro nível.
 Os dois são só de leitura (REPEATABLE READ, READ ONLY) e não gravam evento nenhum, nem
 `auditoria.verificada`: dá para usá-los numa cópia restaurada em outro servidor sem alterá-la.
 Conectam com DATABASE_URL.
+
+    uv run sgs-admin diretorio testar [--url URL] [--ca ARQUIVO]
+
+- `diretorio testar` (spec 004, T11; R1.13): conexão, TLS e bind da conta de serviço com a
+  configuração LDAP_*, ou com --url e --ca por cima dela, sem gravar nada. Responde "ok" ou o
+  motivo genérico (certificado, conexao, credencial). Código 0: ok; 1: recusado; 2: configuração
+  inválida. A senha e a mensagem do `ldap3` nunca vão para a saída.
 """
 
 import argparse
@@ -157,6 +164,21 @@ def _parser() -> argparse.ArgumentParser:
     )
     verificar.add_argument("--ancora", type=Path, default=None, metavar="ARQUIVO")
     verificar.set_defaults(comando=_auditoria_verificar)
+
+    diretorio = comandos.add_parser("diretorio", help="diretório LDAP (spec 004)")
+    do_diretorio = diretorio.add_subparsers(title="comandos", required=True, metavar="COMANDO")
+    testar = do_diretorio.add_parser(
+        "testar",
+        help="testa a conexão, o TLS e o bind da conta de serviço (não grava nada)",
+        description=(
+            "Tenta a conexão e o bind da conta de serviço com a configuração LDAP_*, ou com"
+            " --url e --ca por cima dela. Responde ok ou o motivo: certificado, conexao ou"
+            " credencial. Código 0: ok; 1: recusado; 2: configuração inválida."
+        ),
+    )
+    testar.add_argument("--url", default=None, help="no lugar de LDAP_URL")
+    testar.add_argument("--ca", default=None, metavar="ARQUIVO", help="no lugar de LDAP_CA_FILE")
+    testar.set_defaults(comando=_diretorio_testar)
     return parser
 
 
@@ -487,4 +509,38 @@ def _auditoria_verificar(args: argparse.Namespace) -> int:
         verificar_offline(settings.database_url.get_secret_value(), settings, ancora)
     )
     sys.stdout.write(f"{texto}\n")
+    return codigo
+
+
+# --------------------------------------------------------------- diretório (spec 004, T11)
+
+CONFIGURACAO_INVALIDA = 2
+
+
+async def conferir_diretorio(
+    settings: Settings, *, url: str | None = None, ca: str | None = None
+) -> tuple[int, str]:
+    """(código de saída, texto) do teste de conexão e bind da conta de serviço. Só o motivo
+    genérico vai para o texto: nada da senha nem da mensagem do `ldap3`."""
+    from src.modules.identity.infrastructure.ldap3_directory import Ldap3Directory, LdapConfig
+
+    trocas = {"ldap_url": url, "ldap_ca_file": ca}
+    settings = settings.model_copy(update={k: v for k, v in trocas.items() if v is not None})
+    if settings.ldap_url is None:
+        return CONFIGURACAO_INVALIDA, "LDAP_URL: o LDAP está desligado; defina-a ou use --url"
+    problemas = settings.problemas_do_ldap()
+    if problemas:
+        return CONFIGURACAO_INVALIDA, "; ".join(problemas)
+    config = LdapConfig.from_settings(settings)
+    if config is None:  # pragma: no cover - LDAP_URL conferida acima
+        return CONFIGURACAO_INVALIDA, "LDAP_URL: o LDAP está desligado"
+    motivo = await Ldap3Directory(config).testar()
+    return (0, "ok") if motivo == "ok" else (1, f"diretório recusado: {motivo}")
+
+
+def _diretorio_testar(args: argparse.Namespace) -> int:
+    codigo, texto = asyncio.run(conferir_diretorio(load_settings(), url=args.url, ca=args.ca))
+    (sys.stdout if codigo == 0 else sys.stderr).write(
+        f"{texto}\n" if codigo == 0 else f"sgs-admin: {texto}\n"
+    )
     return codigo

@@ -19,6 +19,7 @@ from src.core.ids import uuid7
 from src.modules.access.application.permissoes import ResolvedorDePermissoes
 from src.modules.access.domain.authorization import Area, Distrito, Escopo, Global, Unidade
 from src.modules.access.infrastructure.repository import SqlRepositorioDePermissoes
+from tests.integration.acesso import grupo_espelhado
 from tests.integration.postgres import BancoDeTeste, motor
 
 SAUDE_MENTAL = 1
@@ -258,6 +259,7 @@ async def test_atribuicao_derivada_de_grupo_vale_como_a_direta(
     """003/R3.1: design § Resolução, passo 1 (atribuições diretas e derivadas de grupo)."""
     usuario = await _novo_usuario(sessoes)
     async with sessoes() as sessao, sessao.begin():
+        grupo = await grupo_espelhado(sessao)
         mapeamento = await sessao.scalar(
             text(
                 "INSERT INTO group_role_mappings"
@@ -265,7 +267,7 @@ async def test_atribuicao_derivada_de_grupo_vale_como_a_direta(
                 " SELECT :id, :grupo, id, 'distrito', :distrito, :usuario"
                 " FROM roles WHERE code = 'TECNICO_DISTRITAL' RETURNING id"
             ),
-            {"id": uuid7(), "grupo": uuid7(), "distrito": str(DS_III), "usuario": usuario},
+            {"id": uuid7(), "grupo": grupo, "distrito": str(DS_III), "usuario": usuario},
         )
         await sessao.execute(
             text(

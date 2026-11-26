@@ -38,6 +38,16 @@ export async function verificarMfa(mfaToken, codigo) {
   guardar(dados);
 }
 
+// Origens de login ligadas na API (spec 004, R3.9). Sem resposta válida, fica só a senha local.
+export async function provedores() {
+  try {
+    const { dados } = await chamar('GET', '/auth/provedores', { autenticar: false });
+    return { ldap: dados?.ldap === true, oidc: dados?.oidc === true };
+  } catch {
+    return { ldap: false, oidc: false };
+  }
+}
+
 // Refresh silencioso (R2.4); chamadas simultâneas compartilham a mesma renovação.
 export function renovar() {
   if (!renovacaoEmCurso) {

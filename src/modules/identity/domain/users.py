@@ -35,6 +35,11 @@ def normalize_username(username: str) -> str:
     return username.strip().lower()
 
 
+def is_valid_email(email: str) -> bool:
+    """Se `User` aceita o e-mail, já em minúsculas e sem espaços nas pontas, como ele o guarda."""
+    return len(email) <= EMAIL_MAX and _EMAIL.fullmatch(email) is not None
+
+
 @dataclass(frozen=True)
 class User:
     id: UUID
@@ -67,11 +72,9 @@ class User:
             raise DomainValidationError("Dados de usuário inválidos.", errors=errors)
 
     def _check_email(self) -> list[FieldError]:
-        if self.email is None:
+        if self.email is None or is_valid_email(self.email):
             return []
-        if len(self.email) > EMAIL_MAX or not _EMAIL.fullmatch(self.email):
-            return [FieldError(campo="email", mensagem="E-mail inválido.")]
-        return []
+        return [FieldError(campo="email", mensagem="E-mail inválido.")]
 
     def _check_credentials(self) -> list[FieldError]:
         errors: list[FieldError] = []

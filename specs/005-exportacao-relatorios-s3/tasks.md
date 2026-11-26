@@ -42,13 +42,16 @@ Pontos de encontro desta spec:
 | T6 | C | T4, T5, T12 | rotas e composição na raiz |
 | T7 | A | — | documento |
 | T8 | C | T6, T10, 004/T8 | compose com as peças compartilhadas da 004 |
+| T13 | B | T8, 004/T14 | opcional: o compose inteiro numa conta AWS real (§ Opcional) |
 
 ## Tarefas
-- [ ] T0. Base comum das specs 004 e 005. É a mesma tarefa que a 004/T0, num commit `(004/T0, 005/T0)`; a descrição completa está em `specs/004-diretorio-ldap-oidc/tasks.md`.
+- [x] T0. Base comum das specs 004 e 005. É a mesma tarefa que a 004/T0, num commit `(004/T0, 005/T0)`; a descrição completa está em `specs/004-diretorio-ldap-oidc/tasks.md`.
+  - Concluída em 24/11/2026 (`make check` verde). Prova: `tests/unit/core/test_errors.py::test_service_unavailable_responde_503`
   - Frente: base
   - Requisitos: — (infraestrutura das tarefas seguintes)
   - Pronto quando: `uv.lock` travado, `tests/unit/core/test_errors.py::test_service_unavailable_responde_503` passa e o `make check` está verde
-- [ ] T10. Conferência antecipada do SeaweedFS, sem mudar o repositório
+- [x] T10. Conferência antecipada do SeaweedFS, sem mudar o repositório
+  - Concluída em 26/11/2026 (`make check` verde). Prova: registro em `design.md` § Riscos, "Conferência antecipada do SeaweedFS"
   - Frente: C
   - Faz:
     - sobe a imagem `chrislusf/seaweedfs` na tag que a T8 vai fixar, com o S3 em HTTPS (certificado de teste);
@@ -59,7 +62,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: —
   - Requisitos: R2.8, R6.1 (verificação de viabilidade)
   - Pronto quando: o resultado (tag, comandos, resposta) está registrado no design § Riscos. Se a SSE não vier confirmada, a frente C para e a decisão volta ao dono (G1).
-- [ ] T12. Filtros e comparação de escopo (domínio puro)
+- [x] T12. Filtros e comparação de escopo (domínio puro)
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_filtros.py`, `tests/unit/reports/test_escopo_cobre.py`
   - Frente: C
   - Faz:
     - modelos dos filtros por tipo, com o período da trilha de até 366 dias;
@@ -67,7 +71,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: —
   - Requisitos: R1.2, R1.5, R3.3
   - Pronto quando: `tests/unit/reports/test_filtros.py` e `tests/unit/reports/test_escopo_cobre.py` passam
-- [ ] T1. Migração `0005_relatorios` e repositório de pedidos
+- [x] T1. Migração `0005_relatorios` e repositório de pedidos
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_report_jobs.py`
   - Frente: C
   - Faz:
     - `report_jobs` com versão do objeto, colunas de assinatura, `CHECK` de coerência e índices;
@@ -77,7 +82,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R1.1, R2.5, R5.1
   - Pronto quando: `tests/integration/reports/test_report_jobs.py` passa
-- [ ] T2. Geradores CSV e XLSX
+- [x] T2. Geradores CSV e XLSX
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_generators.py::test_xlsx_nenhuma_celula_e_formula_e_texto_perigoso_ganha_aspa`, `::test_csv_utf8_com_bom_ponto_e_virgula_e_crlf` e `::test_sha256_e_tamanho_calculados_durante_a_escrita_conferem_com_o_arquivo` (arquivo inteiro passa)
   - Frente: C
   - Faz:
     - CSV: UTF-8 com BOM, `;` e `\r\n`;
@@ -88,7 +94,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R1.2, R4.1, R4.2, R4.3
   - Pronto quando: `tests/unit/reports/test_generators.py` passa
-- [ ] T11. Consultas dos relatórios em SQL explícito
+- [x] T11. Consultas dos relatórios em SQL explícito
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_consultas_relatorio.py`
   - Frente: C
   - Faz:
     - `inventario_unidades.sql` (`vw_unit_inventory`), `trilha_auditoria_global.sql` e `trilha_auditoria_escopo.sql` (`vw_unit_history`), com cabeçalho (ADR-0009);
@@ -98,7 +105,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T1
   - Requisitos: R1.3, R4.3
   - Pronto quando: `tests/integration/reports/test_consultas_relatorio.py` passa
-- [ ] T3. Armazenamento S3: porta, adaptador e conferência da gravação
+- [x] T3. Armazenamento S3: porta, adaptador e conferência da gravação
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_conferencia.py`, `tests/integration/reports/test_s3_adapter.py`
   - Frente: C
   - Faz:
     - `ArmazenamentoDeObjetos`, `ObjetoGravado` e `conferir_gravacao` no domínio;
@@ -106,7 +114,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R2.1, R2.3, R2.4, R2.7, R2.8, R3.2, R3.6
   - Pronto quando: `tests/unit/reports/test_conferencia.py` e `tests/integration/reports/test_s3_adapter.py` (`moto`) passam
-- [ ] T4. Configuração S3 e recusas em `prod`
+- [x] T4. Configuração S3 e recusas em `prod`
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/core/test_config.py::test_prod_recusa_iniciar_sem_bucket_papel_external_id_ou_chave_kms`, `::test_prod_recusa_iniciar_com_chave_fixa`, `::test_s3_recusa_endereco_sem_https`, `::test_exportacao_fica_desligada_sem_s3_bucket`
   - Frente: C
   - Faz: campos `S3_*` e `REPORT_RETENTION_DAYS` em `Settings` (`_s3_problems`):
     - só `https://`;
@@ -116,7 +125,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R2.2, R2.7, R2.9
   - Pronto quando: os testes S3 de `tests/unit/core/test_config.py` passam
-- [ ] T9. Assinatura dos relatórios e chaves públicas
+- [x] T9. Assinatura dos relatórios e chaves públicas
+  - Concluída em 25/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_assinatura.py`, `tests/integration/reports/test_chaves_publicas.py`
   - Frente: B
   - Faz:
     - `REPORT_SIGNING_KEYS(_FILE)` em `Settings`: o leitor das chaves JWT, chaves iguais às JWT recusadas, chave de exemplo recusada em `prod`;
@@ -127,7 +137,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T0
   - Requisitos: R5.1, R5.2, R5.4, R5.5
   - Pronto quando: `tests/unit/reports/test_assinatura.py` e `tests/integration/reports/test_chaves_publicas.py` passam
-- [ ] T5. Caso de uso da geração e do envio
+- [x] T5. Caso de uso da geração e do envio
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_gerar_relatorio.py`
   - Frente: C
   - Faz:
     - `gerar_relatorio(id)`: `gerando` só se `pendente`, geração no escopo gravado, assinatura, envio com a sessão de quem pediu, conferência e remoção;
@@ -137,7 +148,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: T1, T2, T3, T9, T11
   - Requisitos: R1.3, R2.5, R2.6, R2.8, R5.1
   - Pronto quando: `tests/integration/reports/test_gerar_relatorio.py` passa
-- [ ] T6. Rotas de pedido, consulta, listagem e download
+- [x] T6. Rotas de pedido, consulta, listagem e download
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/integration/reports/test_report_routes.py`
   - Frente: C
   - Faz:
     - `POST /relatorios` com a permissão de dados do tipo e `relatorio.solicitado`;
@@ -160,7 +172,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: —
   - Requisitos: R2.1, R2.3
   - Pronto quando: o documento foi revisado por um integrante
-- [ ] T8. SeaweedFS no compose e demonstração ponta a ponta
+- [x] T8. SeaweedFS no compose e demonstração ponta a ponta
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/e2e/test_export_s3.py -m slow` (3 passed)
   - Frente: C
   - Primeira hora: conferir de novo, já no compose, a SSE e o TLS vistos na T10.
   - Faz:
@@ -180,6 +193,74 @@ Pontos de encontro desta spec:
 
 ## Opcional, se houver conta AWS (G1)
 Fica fora da lista acima, porque depende de conta. Se a conta permitir criar papel IAM e chave KMS, uma tarefa de evidência roda o envio numa conta real, com o papel e a chave da T7, e registra o resultado em `docs/operacao/evidencias/` (R2.1, R2.3, R2.9).
+
+A conta que o grupo tem é um *Learner Lab* do AWS Academy, que não deixa criar papel IAM. A T13 abaixo adapta a evidência a ela.
+
+- [x] T13. Laboratório na AWS (Learner Lab) e evidência
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/architecture/test_laboratorio_aws.py` e `docs/operacao/evidencias/laboratorio-aws-2026-11-26.json` (15 de 15 conferências numa conta real; a sondagem na instância confirmou o caminho `AssumeRole` sem mudar o código).
+  - Status: **Aprovado (G3: Rafael (rafareloM), dono, em 26/11/2026)**. Proposta do agente; registro por autorização expressa dada na sessão de trabalho. Decisões do Rafael na mesma sessão:
+    - conta = *Learner Lab* do AWS Academy: credenciais temporárias, `LabRole` e `LabInstanceProfile` prontos, sem criar papel nem usuário IAM, só `us-east-1`;
+    - recursos do menor porte do nível gratuito, sempre com o comando de parar e o de destruir;
+    - o compose inteiro numa instância EC2, com um bucket S3 real no lugar do SeaweedFS;
+    - `APP_ENV=dev`, com o S3 configurado como em `prod` (`AssumeRole` com `ExternalId`, `aws:kms`); `prod` completo fica como meta para a SR2;
+    - scripts em bash e AWS CLI v2, sem Terraform nem CloudFormation; credenciais só pela cadeia padrão, nunca em argumento nem no repositório;
+    - código até o congelamento de 28/11/2026; evidência até a SR2 (05/12/2026).
+  - Frente: B
+  - Primeira hora: `docker/aws/lab.sh sondar`, que confere se a `LabRole` consegue `sts:AssumeRole` nela mesma (com `ExternalId`, 900 s) e se o `PutObject` com `aws:kms` passa. Roda primeiro no CloudShell ou no host e depois na instância (registrado pelo *user-data*).
+    - Se passar: o caminho de envio da T3 sem mudança (`S3_ASSUME_ROLE_ARN` = ARN da `LabRole`). A confiança da `LabRole` não confere o `ExternalId`; isso fica registrado como limite do laboratório.
+    - Se não passar: a T13 para e propõe uma emenda (fora de `prod`, sem papel e sem chave fixa, o adaptador usa a cadeia padrão do ambiente, isto é, o perfil da instância), para decisão do dono antes do código.
+  - Faz, tudo em `docker/aws/`:
+    - `compose.aws.yml`, sobreposto ao `compose.yml`:
+      - sem `s3` nem `s3-init`;
+      - API com `S3_ASSUME_ROLE_ARN`, `S3_EXTERNAL_ID`, `S3_SSE=aws:kms`, `S3_KMS_KEY_ID` = ARN da chave gerenciada `aws/s3`, sem `S3_ACCESS_KEY_ID` nem `S3_SECRET_ACCESS_KEY`;
+      - Keycloak com a *heap* limitada (cerca de 512 MiB);
+    - `Caddyfile` próprio: nomes `sslip.io` do IP elástico e certificados Let's Encrypt (HTTP-01 na porta 80). O `docker/caddy/Caddyfile` local e as suítes e2e não mudam;
+    - `user-data.sh`, que roda na primeira subida da instância:
+      - instala o Docker e cria 2 GiB de *swap*;
+      - clona o repositório público num commit fixo;
+      - gera os segredos de laboratório na instância (nunca saem dela);
+      - roda a sondagem na instância e sobe o compose;
+    - `lab.sh` com os subcomandos:
+      - `sondar`: a sondagem da primeira hora;
+      - `subir`: grupo de segurança, IP elástico, bucket e instância `t3.small` (Ubuntu 24.04, 20 GiB gp3, `LabInstanceProfile`);
+      - `estado`: estado da instância, IP e endereços;
+      - `liberar-ip`: troca a lista de IPs da porta 443;
+      - `parar` e `ligar`: param e ligam a instância, mantendo o IP elástico;
+      - `evidencia`: a evidência abaixo;
+      - `destruir`: encerra a instância, solta o IP, esvazia (todas as versões) e apaga o bucket e apaga o grupo de segurança;
+
+      e acha cada recurso pela etiqueta `Projeto=sgs-lab`;
+    - grupo de segurança:
+      - 80 aberta a todos (só o redirecionamento e o desafio ACME);
+      - 443 só da lista de IPs da equipe (padrão: o IP de quem roda, por `checkip.amazonaws.com`);
+      - 22 só da lista de prefixos do EC2 Instance Connect;
+      - nenhuma porta de LDAP ou Keycloak;
+    - bucket `sgs-lab-relatorios-<aleatório>` como na T7, menos o papel próprio:
+      - *Block Public Access* com as quatro opções;
+      - versionamento;
+      - política com os `Deny` de TLS e de `PutObject` sem `aws:kms`;
+      - criptografia padrão `aws:kms` com `aws/s3`;
+      - ciclo de vida de 90 dias em `reports/`, com `NoncurrentVersionExpiration` de 1 dia e `ExpiredObjectDeleteMarker`: responde o ponto 1 de § 8 da T7, só para o laboratório;
+    - `docs/operacao/laboratorio-aws.md`: o passo a passo, com uma seção das diferenças em relação à T7 (`LabRole` no lugar de `sgs-report-writer`, `ExternalId` que a confiança não confere, `aws/s3` no lugar da chave própria). O documento da T7 não muda.
+  - Evidência (`lab.sh evidencia`, rodado do host, que está na lista da 443, só com `bash`, `curl`, `jq`, `python3` e AWS CLI):
+    - gera `docs/operacao/evidencias/laboratorio-aws-<data>.json`, com o id da conta e os ARNs trocados por marcadores;
+    - registra:
+      - a identidade usada (nome da sessão do `AssumeRole`);
+      - a resposta do `PutObject` (`aws:kms`, ARN da chave conferido, SHA-256);
+      - o download pela URL pré-assinada (200);
+      - a mesma URL sem assinatura (`AccessDenied`);
+      - o acesso em HTTP recusado pela política;
+      - a sincronização LDAP e o login OIDC pela API, com o formulário do Keycloak percorrido por `curl` e o TOTP por `python3`.
+  - Bloqueada por: T8, 004/T14
+  - Requisitos: R2.1, R2.3, R2.7, R2.8, R6.2 (numa conta real); exercita também a 004 (R1, R3) fora do `localhost`
+  - Pronto quando:
+    - `tests/architecture/test_laboratorio_aws.py` passa no `make check`, conferindo:
+      - `docker compose -f docker/compose.yml -f docker/aws/compose.aws.yml config` válido, sem `s3` nem `s3-init`;
+      - a API com `AssumeRole` e `aws:kms`, sem chave fixa `S3_*`;
+      - o `Caddyfile` da AWS sem `tls internal`;
+      - nada em `docker/aws/` abre a 443 para `0.0.0.0/0`, nem traz credencial ou id de conta;
+      - `shellcheck` limpo em `docker/aws/*.sh` (o teste falha com mensagem clara se o `shellcheck` não estiver instalado);
+    - `docs/operacao/evidencias/laboratorio-aws-<data>.json` existe e vem de uma execução real.
 
 ## Cobertura dos requisitos
 | Requisito | Tarefas |

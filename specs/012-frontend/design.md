@@ -113,6 +113,7 @@ Nenhum. Esta spec não altera o banco. O front não guarda dados de negócio. No
 
 ## Fluxo
 1. **Abertura:** `main.js` chama `auth.refresh()`. Com sucesso, segue para `GET /me` → `perms` → `router`. Com 401, mostra a view de login.
+   - *Referência (25/11/2026):* a spec 004 (aprovada em 24/11/2026) acrescenta a entrada pelo provedor de identidade (OIDC), na abertura e no login. Com `login_erro=oidc` na URL, `main.js` tira o parâmetro e mostra o login com a mensagem de erro. Com o OIDC ligado (`GET /api/v1/auth/provedores`), o login mostra o link "Entrar pelo provedor de identidade". O texto está em `specs/004-diretorio-ldap-oidc/design.md` § Front-end (R3.9), e a implementação, na 004/T10. Esta nota não muda o status nem o texto normativo desta spec.
 2. **Login:** `login` → (`enroll` → `confirm`) ou `verify`. O token fica guardado numa variável do módulo `auth.js`.
 3. **Chamada (`api.js`):**
    - `fetch('/api/v1…', {headers: {Authorization: Bearer, 'Content-Type': 'application/json'}})`;

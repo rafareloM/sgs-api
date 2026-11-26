@@ -21,6 +21,9 @@ import { telaNovaUnidade } from './views/nova.js';
 // Abertura (spec 012, design § Fluxo): refresh silencioso → /me → menu → rota.
 let perfil = null;
 
+// Retorno do callback OIDC com falha (spec 004, R3.5, R3.9): um código só, genérico.
+const ERRO_OIDC = 'Não foi possível entrar pelo provedor de identidade. Tente de novo.';
+
 configurarApi({
   token: tokenAtual,
   renovar,
@@ -123,7 +126,9 @@ async function iniciar() {
   iniciarRoteador();
   // A rota só é resolvida com sessão; sem ela, o login (R2.4).
   window.addEventListener('hashchange', () => { if (!perfil) mostrarLogin(abrirApp); }, { capture: true });
-  if (await renovar()) await abrirApp();
+  // voltarAoLogin tira o parâmetro da URL (history.replaceState) antes de mostrar a mensagem.
+  if (new URLSearchParams(location.search).get('login_erro') === 'oidc') voltarAoLogin(ERRO_OIDC);
+  else if (await renovar()) await abrirApp();
   else mostrarLogin(abrirApp);
 }
 

@@ -1,6 +1,6 @@
 # ADR-0007: Dependências complementares da stack (Uvicorn, limits, pytest-cov)
 
-- Status: Aceito (Rafael, 03/10/2026); emenda de 09/11/2026 aceita (Vinicius, 09/11/2026); emenda 2 de 24/11/2026 aceita (Rafael, rafareloM, dono das specs 004 e 005, com o G2 da 004; registro do agente por autorização expressa na sessão de trabalho)
+- Status: Aceito (Rafael, 03/10/2026); emenda de 09/11/2026 aceita (Vinicius, 09/11/2026); emenda 2 de 24/11/2026 aceita (Rafael, rafareloM, dono das specs 004 e 005, com o G2 da 004; registro do agente por autorização expressa na sessão de trabalho); emenda 3 de 24/11/2026 aceita (Rafael, na 004/T0; registro do agente por autorização expressa)
 - Data: 2026-10-03
 - Requisitos relacionados: RS-09, RNF-06; specs 001 (R1.1, R7.1) e 002 (R1.5)
 
@@ -39,3 +39,9 @@ Adicionar à stack, com a mesma regra de versão das demais (série fixa, `uv.lo
 - **httpx em execução.** O login OIDC da spec 004 usa o cliente assíncrono da Authlib (`authlib.integrations.httpx_client`), que precisa do `httpx`. Hoje o `httpx` está só no grupo `dev` (cliente dos testes). A emenda o passa às dependências de execução, na série já travada (0.28.x). Ele entra no `pyproject.toml` na tarefa da 004 que implementa o adaptador OIDC.
 - **Por que não outra coisa.** O cliente `requests` da Authlib é bloqueante e também fica fora da stack. Montar a troca do código com `urllib` reimplementa timeout, TLS e formulário. Detalhes no design da 004, D004-4.
 - Com o aceite, `steering/tech.md` passou a listar `httpx 0.28.x` na tabela da stack, com a nota "cliente HTTP da Authlib (004)".
+
+## Emenda 3 (24/11/2026; aceita pelo Rafael em 24/11/2026, na 004/T0)
+- **Authlib 1.8.x → 1.9.x.** Na T0 das specs 004 e 005, o `pip-audit` do CI acusou oito avisos de segurança na Authlib 1.8.0, corrigidos na 1.9.0 e na 1.9.1: PYSEC-2026-4355 a PYSEC-2026-4360, CVE-2026-96760 e CVE-2026-116672.
+- **Alcance.** A maioria atinge partes que a 004 não usa: o servidor OAuth e a JOSE da Authlib, já que o `id_token` é conferido com o PyJWT (design da 004, D004-3). Mesmo assim, o CI recusa qualquer dependência com aviso conhecido.
+- **Decisão.** A série passa a 1.9.x, travada na 1.9.10 no `uv.lock`. A parte da Authlib que a 004 usa (cliente OAuth assíncrono, PKCE) não muda, e o design da 004 também não.
+- `steering/tech.md` passou a listar `Authlib 1.9.x`.

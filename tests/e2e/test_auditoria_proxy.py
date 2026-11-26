@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from src.tools import crypto_keys, jwt_keys
+from tests.e2e import segredos
 from tests.e2e.redes import Borda, SubnetOcupadaError, borda_da_suite
 
 pytestmark = pytest.mark.slow
@@ -37,6 +38,9 @@ COMPOSE_TESTE = RAIZ / "docker" / "compose.test.yml"
 PROJETO = "sgs-api-e2e-auditoria"
 PORTA_HTTP = "18082"
 PORTA_HTTPS = "18445"
+# Lidos por tests/architecture/test_compose_configuracao.py: a API tem de aceitar esta configuração.
+ARQUIVOS_COMPOSE = (COMPOSE, COMPOSE_TESTE)
+AMBIENTE_COMPOSE = {"SGS_HTTP_PORT": PORTA_HTTP, "SGS_HTTPS_PORT": PORTA_HTTPS}
 CHAVES_JWT = RAIZ / "secrets" / "jwt-keys.json"
 CHAVES_DE_CIFRA = RAIZ / "secrets" / "crypto-keys.json"
 DOCKER = shutil.which("docker")
@@ -68,11 +72,7 @@ print(s.getsockname()[0])
 
 def _docker(*args: str, check: bool = True, timeout: int = 120) -> Resultado:
     assert DOCKER is not None
-    ambiente = (
-        os.environ
-        | {"SGS_HTTP_PORT": PORTA_HTTP, "SGS_HTTPS_PORT": PORTA_HTTPS}
-        | _BORDA[0].ambiente()
-    )
+    ambiente = os.environ | AMBIENTE_COMPOSE | _BORDA[0].ambiente()
     # Comandos fixos deste arquivo, sem entrada externa.
     return subprocess.run(  # noqa: S603
         [DOCKER, *args],
@@ -86,7 +86,7 @@ def _docker(*args: str, check: bool = True, timeout: int = 120) -> Resultado:
 
 
 def _compose(*args: str, check: bool = True, timeout: int = 120) -> Resultado:
-    arquivos = ["-f", str(COMPOSE), "-f", str(COMPOSE_TESTE), "-p", PROJETO]
+    arquivos = [*(a for f in ARQUIVOS_COMPOSE for a in ("-f", str(f))), "-p", PROJETO]
     return _docker("compose", *arquivos, *args, check=check, timeout=timeout)
 
 
@@ -135,6 +135,7 @@ def contexto_tls(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ssl.SSLCo
     if criou_cifra:
         CHAVES_DE_CIFRA.parent.mkdir(exist_ok=True)
         crypto_keys.main(["--output", str(CHAVES_DE_CIFRA)])
+    segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     try:
         subida = _compose("up", "-d", "--build", "--wait", "proxy", check=False, timeout=900)
         if subida.returncode != 0:
@@ -150,6 +151,7 @@ def contexto_tls(tmp_path_factory: pytest.TempPathFactory) -> Iterator[ssl.SSLCo
             CHAVES_JWT.unlink(missing_ok=True)
         if criou_cifra:
             CHAVES_DE_CIFRA.unlink(missing_ok=True)
+        segredos.apagar(segredos_da_005)
         if criou_pasta:
             CHAVES_JWT.parent.rmdir()
 

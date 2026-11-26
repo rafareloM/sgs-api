@@ -5,18 +5,19 @@ O refresh token vai num cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/
 nunca no corpo; o access token vai no corpo, para o front guardar em memória.
 """
 
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Header, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.core.errors import Forbidden, Unauthorized
+from src.core.errors import Forbidden, ServiceUnavailable, Unauthorized
 from src.core.origem import origem_da_requisicao
 from src.core.problem import PROBLEM_JSON
 from src.modules.identity.api.deps import CurrentUser
 from src.modules.identity.application import login as casos
 from src.modules.identity.application.login import Falha, Identidade, Origem, TokensEmitidos
+from src.modules.identity.application.login_ldap import Diretorio, entrar_por_ldap
 
 router = APIRouter(prefix="/api/v1/auth", tags=["autenticação"])
 
@@ -30,6 +31,9 @@ class LoginIn(BaseModel):
 
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=256, repr=False)
+    provider: Literal["local", "ldap"] = Field(
+        default="local", description="`ldap` confere a senha no diretório (spec 004, R2)."
+    )
 
 
 class LoginOut(BaseModel):
@@ -62,6 +66,7 @@ class TokenOut(BaseModel):
 
 _401 = {"description": "Credenciais, código ou token inválidos", "content": {PROBLEM_JSON: {}}}
 _429 = {"description": "Limite de 10 tentativas por minuto por IP", "content": {PROBLEM_JSON: {}}}
+_503 = {"description": "Diretório LDAP indisponível (spec 004)", "content": {PROBLEM_JSON: {}}}
 
 
 def _origem(request: Request) -> Origem:
@@ -118,25 +123,51 @@ def _com_cookie(response: Response, tokens: TokensEmitidos) -> TokenOut:
     return TokenOut(access_token=tokens.access_token, expires_in=tokens.expires_in)
 
 
+def _diretorio(request: Request, sessao: Any) -> Diretorio:
+    estado = request.app.state
+    return Diretorio(
+        porta=estado.diretorio,
+        repositorio=estado.repositorio_do_diretorio(sessao),
+        mapeamentos=estado.repositorio_de_mapeamentos(sessao),
+        atribuicoes=estado.repositorio_de_atribuicoes(sessao),
+        permissoes=estado.repositorio_de_permissoes(sessao),
+    )
+
+
 def _falhou(falha: Falha) -> NoReturn:
+    if falha.status == 503:
+        raise ServiceUnavailable(falha.mensagem)
     if falha.status == 403:
         raise Forbidden(falha.mensagem)
     raise Unauthorized(falha.mensagem)
 
 
-@router.post("/login", summary="Login com usuário e senha", responses={401: _401, 429: _429})
+@router.post(
+    "/login",
+    summary="Login com usuário e senha",
+    responses={401: _401, 429: _429, 503: _503},
+)
 async def entrar(
     request: Request,
     response: Response,
     corpo: LoginIn,
 ) -> LoginOut:
-    """R1: responde o desafio do 2FA (`mfa_required` ou `mfa_enrollment_required`)."""
+    """R1: responde o desafio do 2FA (`mfa_required` ou `mfa_enrollment_required`). Com
+    `provider = "ldap"`, a senha é conferida no diretório (spec 004, R2)."""
     origem = _origem(request)
     request.app.state.limite_de_login.conferir(origem.ip or "desconhecido")
     async with request.app.state.sessoes() as sessao, sessao.begin():
-        resultado = await casos.entrar(
-            corpo.username, corpo.password, origem=origem, deps=_deps(request, sessao)
-        )
+        deps = _deps(request, sessao)
+        if corpo.provider == "ldap":
+            resultado = await entrar_por_ldap(
+                corpo.username,
+                corpo.password,
+                origem=origem,
+                deps=deps,
+                diretorio=_diretorio(request, sessao),
+            )
+        else:
+            resultado = await casos.entrar(corpo.username, corpo.password, origem=origem, deps=deps)
     if isinstance(resultado, Falha):
         _falhou(resultado)
     if resultado.tokens is not None:

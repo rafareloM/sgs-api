@@ -1,6 +1,6 @@
 """Repositório do RBAC sobre a sessão SQLAlchemy de quem o usa (SQLAlchemy Core)."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -12,6 +12,7 @@ from sqlalchemy import (
     Uuid,
     column,
     delete,
+    exists,
     insert,
     or_,
     select,
@@ -22,7 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.modules.access.domain.atribuicoes import Atribuicao, DadosDoUsuario, Papel, nivel_exigido
 from src.modules.access.domain.authorization import Alvo, Concessao, escopo_de
+from src.modules.access.domain.mapeamentos import MapeamentoDeGrupo
 from src.modules.access.infrastructure.tables import (
+    group_role_mappings,
     permissions,
     role_assignments,
     role_permissions,
@@ -31,6 +34,10 @@ from src.modules.access.infrastructure.tables import (
 
 # Só a coluna de versão de `users` (spec 002); a tabela completa é da infraestrutura de identity.
 _users = table("users", column("id", Uuid), column("authz_version", Integer))
+# Tabelas do módulo identity (spec 004), só as colunas que a leitura dos membros usa.
+_users_ativos = table("users", column("id", Uuid), column("is_active", Boolean))
+_user_groups = table("user_groups", column("user_id", Uuid), column("group_id", Uuid))
+_groups = table("groups", column("id", Uuid))
 
 # Só o que liga a unidade aos escopos (spec 006, 0006): o distrito dela e a área técnica do seu
 # tipo. As tabelas completas são da infraestrutura do registry.
@@ -190,6 +197,7 @@ class SqlRepositorioDeAtribuicoes:
                 role_assignments.c.origin,
                 role_assignments.c.valid_until,
                 role_assignments.c.granted_by,
+                role_assignments.c.group_mapping_id,
             )
             .select_from(role_assignments.join(roles, roles.c.id == role_assignments.c.role_id))
             .where(
@@ -237,8 +245,132 @@ class SqlRepositorioDeAtribuicoes:
                 origin=atribuicao.origin,
                 valid_until=atribuicao.valid_until,
                 granted_by=atribuicao.granted_by,
+                group_mapping_id=atribuicao.group_mapping_id,
             )
         )
 
     async def remover(self, id_: UUID) -> None:
         await self._session.execute(delete(role_assignments).where(role_assignments.c.id == id_))
+
+
+_SELECAO_DE_DERIVADA = select(
+    role_assignments.c.id,
+    role_assignments.c.user_id,
+    roles.c.code.label("papel"),
+    role_assignments.c.scope_type,
+    role_assignments.c.scope_id,
+    role_assignments.c.origin,
+    role_assignments.c.valid_until,
+    role_assignments.c.granted_by,
+    role_assignments.c.group_mapping_id,
+).select_from(role_assignments.join(roles, roles.c.id == role_assignments.c.role_id))
+
+_SELECAO_DE_MAPEAMENTO = select(
+    group_role_mappings.c.id,
+    group_role_mappings.c.group_id.label("grupo_id"),
+    roles.c.code.label("papel"),
+    group_role_mappings.c.scope_type,
+    group_role_mappings.c.scope_id,
+    group_role_mappings.c.created_by.label("criado_por"),
+).select_from(group_role_mappings.join(roles, roles.c.id == group_role_mappings.c.role_id))
+
+
+class SqlRepositorioDeMapeamentos:
+    """`RepositorioDeMapeamentos` (003/R3) sobre `group_role_mappings` e `role_assignments`."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def grupo_existe(self, grupo_id: UUID) -> bool:
+        return bool(await self._session.scalar(select(exists().where(_groups.c.id == grupo_id))))
+
+    async def ha_mapeamento(
+        self, grupo_id: UUID, papel: str, escopo_tipo: str, escopo_id: str | None
+    ) -> bool:
+        papel_id = select(roles.c.id).where(roles.c.code == papel).scalar_subquery()
+        return bool(
+            await self._session.scalar(
+                select(
+                    exists().where(
+                        group_role_mappings.c.group_id == grupo_id,
+                        group_role_mappings.c.role_id == papel_id,
+                        group_role_mappings.c.scope_type == escopo_tipo,
+                        group_role_mappings.c.scope_id.is_not_distinct_from(escopo_id),
+                    )
+                )
+            )
+        )
+
+    async def inserir(self, mapeamento: MapeamentoDeGrupo) -> None:
+        papel_id = select(roles.c.id).where(roles.c.code == mapeamento.papel).scalar_subquery()
+        await self._session.execute(
+            insert(group_role_mappings).values(
+                id=mapeamento.id,
+                group_id=mapeamento.grupo_id,
+                role_id=papel_id,
+                scope_type=mapeamento.scope_type,
+                scope_id=mapeamento.scope_id,
+                created_by=mapeamento.criado_por,
+            )
+        )
+
+    async def obter(self, mapeamento_id: UUID) -> MapeamentoDeGrupo | None:
+        resultado = await self._session.execute(
+            _SELECAO_DE_MAPEAMENTO.where(group_role_mappings.c.id == mapeamento_id)
+        )
+        linha = resultado.mappings().one_or_none()
+        return None if linha is None else MapeamentoDeGrupo(**linha)
+
+    async def remover(self, mapeamento_id: UUID) -> None:
+        await self._session.execute(
+            delete(group_role_mappings).where(group_role_mappings.c.id == mapeamento_id)
+        )
+
+    async def listar(self) -> Sequence[MapeamentoDeGrupo]:
+        # O id é uuid7: a ordem do id é a de criação.
+        resultado = await self._session.execute(
+            _SELECAO_DE_MAPEAMENTO.order_by(group_role_mappings.c.id)
+        )
+        return [MapeamentoDeGrupo(**linha) for linha in resultado.mappings()]
+
+    async def dos_grupos(self, grupos: Collection[UUID]) -> Sequence[MapeamentoDeGrupo]:
+        if not grupos:
+            return []
+        resultado = await self._session.execute(
+            _SELECAO_DE_MAPEAMENTO.where(group_role_mappings.c.group_id.in_(list(grupos)))
+        )
+        return [MapeamentoDeGrupo(**linha) for linha in resultado.mappings()]
+
+    async def derivadas_do_usuario(self, usuario_id: UUID) -> Sequence[Atribuicao]:
+        resultado = await self._session.execute(
+            _SELECAO_DE_DERIVADA.where(
+                role_assignments.c.user_id == usuario_id, role_assignments.c.origin == "group"
+            ).order_by(role_assignments.c.id)
+        )
+        return [Atribuicao(**linha) for linha in resultado.mappings()]
+
+    async def derivadas_do_mapeamento(self, mapeamento_id: UUID) -> Sequence[Atribuicao]:
+        resultado = await self._session.execute(
+            _SELECAO_DE_DERIVADA.where(
+                role_assignments.c.group_mapping_id == mapeamento_id
+            ).order_by(role_assignments.c.id)
+        )
+        return [Atribuicao(**linha) for linha in resultado.mappings()]
+
+
+class SqlMembrosDeGrupo:
+    """`MembrosDeGrupo` sobre `user_groups` da spec 004 (004/T4): os membros do grupo com conta
+    ativa, de qualquer origem do grupo (003/R3.1)."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def membros_ativos(self, grupo_id: UUID) -> frozenset[UUID]:
+        consulta = (
+            select(_user_groups.c.user_id)
+            .select_from(
+                _user_groups.join(_users_ativos, _users_ativos.c.id == _user_groups.c.user_id)
+            )
+            .where(_user_groups.c.group_id == grupo_id, _users_ativos.c.is_active)
+        )
+        return frozenset((await self._session.scalars(consulta)).all())

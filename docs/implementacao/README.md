@@ -11,7 +11,7 @@
 | B · OIDC e laboratório | [frente-b-oidc-laboratorio.md](frente-b-oidc-laboratorio.md) | Keycloak e `slapd` no compose, login OIDC, botão no front, assinatura dos relatórios, demonstração ponta a ponta da 004 |
 | C · Relatórios | [frente-c-relatorios.md](frente-c-relatorios.md) | Exportação CSV/XLSX, envio ao S3 com STS, download por URL pré-assinada, SeaweedFS no compose |
 
-**Com agentes, uma pessoa por frente:** [agentes.md](agentes.md) traz a preparação da máquina, as permissões do Claude Code ([claude-settings.exemplo.json](claude-settings.exemplo.json)), o prompt de cada tarefa e o que revisar antes de integrar.
+**Com agentes, uma pessoa por frente:** [agentes.md](agentes.md) traz a skill `/frente` (prepara a máquina e roda cada tarefa), as permissões do Claude Code e o que revisar antes de integrar.
 
 ## Regras que não mudam
 1. **A spec é a fonte da verdade** (`AGENTS.md`). Código que diverge da spec é bug. Se a spec estiver errada, pare e fale com os donos: a mudança vai primeiro para a spec (`Em revisão`), depois para o código.
@@ -30,7 +30,7 @@ Leia, nesta ordem:
 3. o `design.md` e o `tasks.md` da spec de cada tarefa da sua frente;
 4. o guia da sua frente.
 
-Prepare a máquina:
+Prepare a máquina (com o Claude Code, a skill `/frente` faz isto: [agentes.md](agentes.md#a-skill-frente)):
 - Docker 26 ou mais novo (Compose v2), [uv](https://docs.astral.sh/uv/), GNU Make e git com acesso ao `rafareloM/sgs-api`.
 - Siga o README § Desenvolvimento e § Subir o ambiente:
 
@@ -44,7 +44,7 @@ Prepare a máquina:
   make check          # precisa do Docker: os testes de integração sobem um PostgreSQL
   ```
 
-- O `make check` tem de passar na `main` antes de você mudar qualquer coisa. Se não passar, o problema é da máquina, não da tarefa.
+- O `make check` tem de passar no *worktree* da frente (§ Ramos e *worktrees*), que sai do `feat/004-005`, antes de você mudar qualquer coisa. Se não passar, o problema é da máquina, não da tarefa.
 - **Agente de código.** Rode o agente (Claude Code ou outro) num terminal da máquina, dentro do *worktree* da frente, com acesso ao Docker. Um editor em sandbox (por exemplo, o VS Code em Flatpak) esconde o Docker e o `uv`, e os testes de integração não rodam.
 
 ## Ramos e *worktrees*

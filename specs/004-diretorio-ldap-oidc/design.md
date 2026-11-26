@@ -3,7 +3,7 @@
 - Status: **Aprovado (G2: Rafael (rafareloM), dono, em 24/11/2026)**. Registro do agente por autorização expressa dada na sessão de trabalho, com as recomendações de § Pontos para o G2 aceitas (§ Decisões do G2). Aprovação só do dono, pela exceção de `steering/sdd-workflow.md` § Exceção pontual: specs 004 e 005. **Limitação: o design não teve revisão de um segundo integrante.**
 - Requisitos: requirements.md (Aprovado, G1 do Rafael em 24/11/2026)
 - Decisões: ADR-0003 (identidade federada com tokens próprios, Aceito). Emenda 2 do ADR-0007 (httpx como dependência de execução, D004-4), aceita no G2.
-- Histórico: rascunho de 03/10/2026 (portas, configuração, algoritmo da sincronização); notas de 09/11/2026 e 24/11/2026 ("Ajustes pendentes do G1"); reescrito por agente em 24/11/2026 com `/spec-design`, depois do G1, aplicando aquelas notas e cobrindo os critérios novos (R1.13, R1.14, R3.7–R3.9, R4.3, R4.4, R5).
+- Histórico: rascunho de 03/10/2026 (portas, configuração, algoritmo da sincronização); notas de 09/11/2026 e 24/11/2026 ("Ajustes pendentes do G1"); reescrito por agente em 24/11/2026 com `/spec-design`, depois do G1, aplicando aquelas notas e cobrindo os critérios novos (R1.13, R1.14, R3.7–R3.9, R4.3, R4.4, R5). Emendado em 25/11/2026 com as decisões de execução do Rafael (§ Decisões de execução).
 
 ## Visão geral
 A API passa a aceitar três origens de identidade. Todas terminam no mesmo lugar: uma linha em `users`, grupos espelhados em `groups` e `user_groups`, atribuições derivadas pelo mapeamento da spec 003 e os tokens próprios da spec 002 (ADR-0003).
@@ -149,7 +149,7 @@ Lida só por `Settings` (`src/core/config.py`). Sem `LDAP_URL`, o LDAP fica desl
 | `OIDC_DISCOVERY_URL` | `https://keycloak:8443/realms/sgs/.well-known/openid-configuration` | opcional; padrão `{OIDC_ISSUER}/.well-known/openid-configuration`; `https://` | R3.2 |
 | `OIDC_CA_FILE` | `/certs-servicos/ca.crt` | opcional; sem ela, as CAs do sistema | R3.2 |
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | `sgs-api` / `sgs-lab-exemplo-oidc` | obrigatórias com `OIDC_ISSUER`; em `prod`, segredo de exemplo recusado | R3.1, R5.4 |
-| `OIDC_REDIRECT_URI` | `https://localhost/api/v1/auth/oidc/callback` | obrigatória com `OIDC_ISSUER`; `https://`; caminho igual a `/api/v1/auth/oidc/callback` | R3.8 |
+| `OIDC_REDIRECT_URI` | `https://localhost/api/v1/auth/oidc/callback` | obrigatória com `OIDC_ISSUER`; `https://`; caminho igual a `/api/v1/auth/oidc/callback`; mesma origem de `FRONTEND_URL` (§ Decisões de execução) | R3.8 |
 | `FRONTEND_URL` | `https://localhost/` | obrigatória com `OIDC_ISSUER`; `https://`, terminada em `/`, sem query nem fragmento; a origem dela tem de estar em `CORS_ORIGINS` (o front renova a sessão dali) | R3.8, R3.9 |
 | `OIDC_GROUPS_CLAIM` | `groups` | — | R3.3 |
 | `OIDC_REQUIRED_ACR` | vazio | opcional; lista separada por vírgula dos `acr` aceitos; vai também em `acr_values` no pedido | R3.6 |
@@ -371,6 +371,7 @@ Proxy e API não ganham outra rede em comum. Se ganhassem, o Caddy poderia chega
 | Bloqueio de conta no AD por *binds* errados | O bloqueio local (5 falhas) corta antes do *bind*; os limites do AD costumam ser maiores |
 | Uma instância só da API (agendador, tarefas em segundo plano, recuperação na subida) | É o desenho do projeto (arquitetura § worker); mais de uma instância exige fila, fora do escopo |
 | Diretório real com `username` ou e-mail iguais aos de contas locais | Viram conflitos visíveis na execução, sem bloquear os demais |
+| Chave removida ou revogada no provedor continua aceita: o JWKS em cache só recarrega com `kid` desconhecido | Risco aceito até a SR2 (§ Decisões de execução): depois de remover ou revogar uma chave no provedor, reinicie a API. Validade do cache fica para depois da SR2 |
 
 ## Estratégia de testes
 Todo teste cita o critério na docstring (`"""004/R1.7"""`). Sem internet: o LDAP é `MOCK_SYNC` ou um servidor TLS local, o OIDC é um provedor falso com JWKS gerado no teste.
@@ -441,3 +442,9 @@ Sem cobertura: nenhum.
 - A escolha de LDAP na tela de login fica fora desta spec. O login LDAP é demonstrado pela API e pelo teste ponta a ponta.
 - O trabalho das specs 004 e 005 corre em três frentes simultâneas. A divisão e os pontos de encontro estão em `tasks.md` (G3).
 - Continuam abertas, sem bloquear: AD ou OpenLDAP e o atributo de distrito ou unidade.
+
+## Decisões de execução (Rafael, 25/11/2026)
+Registro do agente por autorização expressa dada na sessão de trabalho, depois da revisão de código da 004/T6 e da 005/T9.
+- **`OIDC_REDIRECT_URI` com a mesma origem de `FRONTEND_URL`** (§ Configuração). A API recusa a subida se as origens forem diferentes, em `_oidc_problems()`. Outra combinação não funciona: o link do front é relativo, então o login começa no host do front; o cookie `sgs_oidc` é desse host e não chega a um callback em outro; e o cookie de refresh gravado pelo callback ficaria num host de onde o front não renova a sessão. O compose já deriva os dois de `SGS_PUBLIC_URL` (§ Caddy e compose).
+- **JWKS sem validade no cache, por enquanto** (§ Riscos). Fica a recarga por `kid` desconhecido, no máximo uma vez por minuto. Uma chave removida ou revogada no provedor continua aceita até a API reiniciar. Risco aceito até a SR2; a validade do cache volta a ser discutida depois dela.
+- **Achados da revisão da frente A (26/11/2026, pedido do Helder, a confirmar com o Rafael).** S2: mapeamento com `grupo_id` inexistente responde 422 no campo. S4: o login LDAP e o OIDC gravam `usuario.atualizado` quando o diretório muda nome ou e-mail, só com os nomes dos campos. S5, critério mínimo: um retrato sem nenhum usuário, com contas LDAP ativas no banco, faz a execução falhar ("Diretório sem usuários; nada foi desativado") sem tocar em nada; um retrato pequeno, mas não vazio, ainda desativa quem ficou de fora.

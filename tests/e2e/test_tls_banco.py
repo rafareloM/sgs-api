@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from src.tools import crypto_keys, jwt_keys
+from tests.e2e import segredos
 from tests.e2e.redes import Borda, SubnetOcupadaError, borda_da_suite
 
 pytestmark = pytest.mark.slow
@@ -21,6 +22,9 @@ pytestmark = pytest.mark.slow
 RAIZ = Path(__file__).resolve().parents[2]
 COMPOSE = RAIZ / "docker" / "compose.yml"
 PROJETO = "sgs-api-e2e-tls"
+# Lidos por tests/architecture/test_compose_configuracao.py: a API tem de aceitar esta configuração.
+ARQUIVOS_COMPOSE = (COMPOSE,)
+AMBIENTE_COMPOSE: dict[str, str] = {}
 CHAVES_JWT = RAIZ / "secrets" / "jwt-keys.json"
 CHAVES_DE_CIFRA = RAIZ / "secrets" / "crypto-keys.json"
 DOCKER = shutil.which("docker")
@@ -75,7 +79,7 @@ _BORDA: list[Borda] = []
 
 def _rodar(*comando: str, check: bool = True, timeout: int = 120) -> Resultado:
     # Comandos fixos deste arquivo, sem entrada externa.
-    ambiente = os.environ | (_BORDA[0].ambiente() if _BORDA else {})
+    ambiente = os.environ | AMBIENTE_COMPOSE | (_BORDA[0].ambiente() if _BORDA else {})
     return subprocess.run(  # noqa: S603
         comando,
         capture_output=True,
@@ -90,7 +94,14 @@ def _rodar(*comando: str, check: bool = True, timeout: int = 120) -> Resultado:
 def _compose(*args: str, check: bool = True, timeout: int = 120) -> Resultado:
     assert DOCKER is not None
     return _rodar(
-        DOCKER, "compose", "-f", str(COMPOSE), "-p", PROJETO, *args, check=check, timeout=timeout
+        DOCKER,
+        "compose",
+        *(a for f in ARQUIVOS_COMPOSE for a in ("-f", str(f))),
+        "-p",
+        PROJETO,
+        *args,
+        check=check,
+        timeout=timeout,
     )
 
 
@@ -128,6 +139,7 @@ def ambiente() -> Iterator[None]:
     if criou_cifra:  # idem para as chaves do FieldCipher (002/T5)
         CHAVES_DE_CIFRA.parent.mkdir(exist_ok=True)
         crypto_keys.main(["--output", str(CHAVES_DE_CIFRA)])
+    segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     try:
         subida = _compose("up", "-d", "--build", "--wait", "api", check=False, timeout=900)
         if subida.returncode != 0:
@@ -140,6 +152,7 @@ def ambiente() -> Iterator[None]:
             CHAVES_JWT.unlink(missing_ok=True)
         if criou_cifra:
             CHAVES_DE_CIFRA.unlink(missing_ok=True)
+        segredos.apagar(segredos_da_005)
         if criou_pasta:
             CHAVES_JWT.parent.rmdir()
 

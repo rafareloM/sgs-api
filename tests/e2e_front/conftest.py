@@ -23,6 +23,7 @@ from playwright.sync_api import Browser, BrowserContext, Page, expect, sync_play
 from playwright.sync_api import Error as ErroDoPlaywright
 
 from src.tools import crypto_keys, jwt_keys
+from tests.e2e import segredos
 from tests.e2e.redes import Borda, SubnetOcupadaError, borda_da_suite
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -32,6 +33,15 @@ PROJETO = "sgs-api-e2e-front-ui"
 PORTA_HTTP = "18081"
 PORTA_HTTPS = "18444"
 BASE = f"https://localhost:{PORTA_HTTPS}"
+# Lidos por tests/architecture/test_compose_configuracao.py: a API tem de aceitar esta configuração.
+ARQUIVOS_COMPOSE = (COMPOSE, COMPOSE_TESTE)
+AMBIENTE_COMPOSE = {
+    "SGS_HTTP_PORT": PORTA_HTTP,
+    "SGS_HTTPS_PORT": PORTA_HTTPS,
+    "SGS_CORS_ORIGINS": BASE,  # o refresh confere a Origin (002/R3.6; spec 012, R2.4)
+    # FRONTEND_URL sai daqui, e a API exige a origem dele em CORS_ORIGINS (004/T6).
+    "SGS_PUBLIC_URL": BASE,
+}
 CHAVES_JWT = RAIZ / "secrets" / "jwt-keys.json"
 CHAVES_DE_CIFRA = RAIZ / "secrets" / "crypto-keys.json"
 DOCKER = shutil.which("docker")
@@ -62,16 +72,14 @@ def _compose(
     *args: str, check: bool = True, timeout: int = 120
 ) -> subprocess.CompletedProcess[str]:
     assert DOCKER is not None
-    ambiente = (
-        os.environ
-        | {
-            "SGS_HTTP_PORT": PORTA_HTTP,
-            "SGS_HTTPS_PORT": PORTA_HTTPS,
-            "SGS_CORS_ORIGINS": BASE,  # o refresh confere a Origin (002/R3.6; spec 012, R2.4)
-        }
-        | _BORDA[0].ambiente()
-    )
-    comando = [DOCKER, "compose", "-f", str(COMPOSE), "-f", str(COMPOSE_TESTE), "-p", PROJETO]
+    ambiente = os.environ | AMBIENTE_COMPOSE | _BORDA[0].ambiente()
+    comando = [
+        DOCKER,
+        "compose",
+        *(a for f in ARQUIVOS_COMPOSE for a in ("-f", str(f))),
+        "-p",
+        PROJETO,
+    ]
     # Comandos fixos deste arquivo, sem entrada externa.
     return subprocess.run(  # noqa: S603
         [*comando, *args],
@@ -101,6 +109,7 @@ def senha_demo() -> Iterator[str]:
     if criou_cifra:
         CHAVES_DE_CIFRA.parent.mkdir(exist_ok=True)
         crypto_keys.main(["--output", str(CHAVES_DE_CIFRA)])
+    segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     senha = secrets.token_urlsafe(16)
     try:
         subida = _compose("up", "-d", "--build", "--wait", "proxy", check=False, timeout=900)
@@ -128,6 +137,7 @@ def senha_demo() -> Iterator[str]:
             CHAVES_JWT.unlink(missing_ok=True)
         if criou_cifra:
             CHAVES_DE_CIFRA.unlink(missing_ok=True)
+        segredos.apagar(segredos_da_005)
         if criou_pasta:
             CHAVES_JWT.parent.rmdir()
 

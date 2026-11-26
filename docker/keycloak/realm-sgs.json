@@ -1,0 +1,68 @@
+{
+  "realm": "sgs",
+  "displayName": "SGS · laboratório",
+  "enabled": true,
+  "sslRequired": "all",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["pt-BR"],
+  "defaultLocale": "pt-BR",
+  "groups": [
+    {"name": "oidc-admin-ti"},
+    {"name": "oidc-gestor-dados"},
+    {"name": "oidc-coord-tecnico"},
+    {"name": "oidc-tecnico-ds-iv"},
+    {"name": "oidc-gestor-unidade-cnes-1000002"},
+    {"name": "oidc-diretoria"},
+    {"name": "oidc-auditor"}
+  ],
+  "users": [
+    {"username": "oidc.admin.ti", "firstName": "Admin TI", "lastName": "Fictício", "email": "oidc.admin.ti@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-admin-ti"]},
+    {"username": "oidc.gestor.dados", "firstName": "Gestor de Dados", "lastName": "Fictício", "email": "oidc.gestor.dados@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-gestor-dados"]},
+    {"username": "oidc.coord.tecnico", "firstName": "Coordenação Técnica", "lastName": "Fictício", "email": "oidc.coord.tecnico@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-coord-tecnico"]},
+    {"username": "oidc.tecnico.ds4", "firstName": "Técnico DS-IV", "lastName": "Fictício", "email": "oidc.tecnico.ds4@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-tecnico-ds-iv"]},
+    {"username": "oidc.gestor.unidade", "firstName": "Gestor de Unidade", "lastName": "Fictício", "email": "oidc.gestor.unidade@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-gestor-unidade-cnes-1000002"]},
+    {"username": "oidc.diretoria", "firstName": "Diretoria", "lastName": "Fictício", "email": "oidc.diretoria@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-diretoria"]},
+    {"username": "oidc.auditor", "firstName": "Auditoria", "lastName": "Fictício", "email": "oidc.auditor@oidc.lab.example.org", "emailVerified": true, "enabled": true, "credentials": [{"type": "password", "value": "sgs-lab-exemplo-usuario", "temporary": false}], "groups": ["/oidc-auditor"]}
+  ],
+  "clients": [
+    {
+      "clientId": "sgs-api",
+      "name": "SGS API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "sgs-lab-exemplo-oidc",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": ["${SGS_PUBLIC_URL}/api/v1/auth/oidc/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

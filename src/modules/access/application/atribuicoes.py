@@ -25,6 +25,7 @@ __all__ = [
     "listar_papeis",
     "perfil",
     "remover",
+    "validar_escopo",
 ]
 
 PERMISSAO = "papel:assign"
@@ -99,21 +100,7 @@ async def atribuir(
     erros: list[FieldError] = []
     if await atribuicoes.usuario(usuario_id) is None:
         erros.append(FieldError(campo="usuario_id", mensagem="Usuário inexistente."))
-    definicao = await atribuicoes.papel(papel)
-    if definicao is None:
-        erros.append(FieldError(campo="papel", mensagem="Papel inexistente."))
-    elif escopo_tipo != definicao.escopo_exigido:
-        erros.append(
-            FieldError(
-                campo="escopo_tipo",
-                mensagem=f"O papel {papel} exige escopo {definicao.escopo_exigido}.",
-            )
-        )
-    if escopo_tipo == "global":
-        if escopo_id is not None:
-            erros.append(FieldError(campo="escopo_id", mensagem="Escopo global não tem id."))
-    elif escopo_id is None or not await atribuicoes.escopo_existe(escopo_tipo, escopo_id):
-        erros.append(FieldError(campo="escopo_id", mensagem="Escopo inexistente."))
+    erros.extend(await validar_escopo(papel, escopo_tipo, escopo_id, atribuicoes=atribuicoes))
     if valido_ate is not None and valido_ate <= relogio():
         erros.append(FieldError(campo="valido_ate", mensagem="A validade precisa ser futura."))
     if erros:
@@ -145,6 +132,30 @@ async def atribuir(
         },
     )
     return atribuicao
+
+
+async def validar_escopo(
+    papel: str, escopo_tipo: str, escopo_id: str | None, *, atribuicoes: RepositorioDeAtribuicoes
+) -> list[FieldError]:
+    """R2.1, R2.2: o papel existe, o escopo é o exigido por ele e existe. Vale também para o
+    mapeamento de grupo (R3.1)."""
+    erros: list[FieldError] = []
+    definicao = await atribuicoes.papel(papel)
+    if definicao is None:
+        erros.append(FieldError(campo="papel", mensagem="Papel inexistente."))
+    elif escopo_tipo != definicao.escopo_exigido:
+        erros.append(
+            FieldError(
+                campo="escopo_tipo",
+                mensagem=f"O papel {papel} exige escopo {definicao.escopo_exigido}.",
+            )
+        )
+    if escopo_tipo == "global":
+        if escopo_id is not None:
+            erros.append(FieldError(campo="escopo_id", mensagem="Escopo global não tem id."))
+    elif escopo_id is None or not await atribuicoes.escopo_existe(escopo_tipo, escopo_id):
+        erros.append(FieldError(campo="escopo_id", mensagem="Escopo inexistente."))
+    return erros
 
 
 async def remover(

@@ -18,6 +18,12 @@ dependencies = [
   "pwdlib[argon2]>=0.3,<0.4",
   "pyotp>=2.10,<2.11",
   "limits>=5.8,<6",
+  # Specs 004 e 005 (T0). httpx em execução: ADR-0007, emenda 2 (cliente HTTP da Authlib).
+  "ldap3==2.9.1",
+  "authlib>=1.9.10,<1.10",
+  "httpx>=0.28.1,<0.29",
+  "boto3>=1.43.127,<1.44",
+  "openpyxl>=3.1.5,<3.2",
 ]
 
 # Comandos de administração (spec 002 § Decisões: argparse). Subcomandos em src/tools/sgs_admin.py.
@@ -32,13 +38,13 @@ dev = [
   "pytest>=9.1.1,<10",
   "pytest-asyncio>=1.4.0,<2",
   "pytest-cov>=7.1.0,<8",
-  "httpx>=0.28.1,<0.29",
   "testcontainers>=4.15.0,<5",
   "hypothesis>=6.168.3,<7",
   "bandit>=1.9.4,<2",
   "pip-audit>=2.10.1,<3",
   "pre-commit>=4.6.2,<5",
   "playwright>=1.50,<2",
+  "moto[s3]>=5.2.6,<6",
 ]
 
 [build-system]
@@ -77,6 +83,23 @@ files = ["src", "tests", "migrations"]
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
+
+# Bibliotecas sem tipos das specs 004 e 005 (T0). Só os adaptadores de infrastructure as importam
+# (contratos "dominio-puro" e "aplicacao-sem-frameworks" do import-linter).
+[[tool.mypy.overrides]]
+module = [
+  "ldap3",
+  "ldap3.*",
+  "authlib",
+  "authlib.*",
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*",
+  "openpyxl",
+  "openpyxl.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "9.0"
@@ -118,6 +141,13 @@ forbidden_modules = [
   "uvicorn",
   "structlog",
   "pydantic_settings",
+  # Bibliotecas das specs 004 e 005: só nos adaptadores de infrastructure (T0).
+  "ldap3",
+  "authlib",
+  "httpx",
+  "boto3",
+  "botocore",
+  "openpyxl",
 ]
 ignore_imports = ["src.modules.*.domain.** -> src.core.errors"]
 unmatched_ignore_imports_alerting = "none"
@@ -152,6 +182,13 @@ forbidden_modules = [
   "uvicorn",
   "structlog",
   "pydantic_settings",
+  # Bibliotecas das specs 004 e 005: só nos adaptadores de infrastructure (T0).
+  "ldap3",
+  "authlib",
+  "httpx",
+  "boto3",
+  "botocore",
+  "openpyxl",
 ]
 ignore_imports = [
   "src.modules.*.application.** -> src.core.errors",

@@ -1,6 +1,8 @@
 # Ambiente local (spec 001, R1.1): API, PostgreSQL e proxy TLS.
 # A API conecta ao banco por TLS com verificação do certificado e do nome (spec 011, R10.3).
-# LDAP, Keycloak e S3 local entram nas specs 004 e 005.
+# Laboratório da spec 004 (design § Ambiente): Keycloak em keycloak.localhost, pelo proxy, e LDAP
+# só por LDAPS, sem porta no host. Spec 005 (T8; design § Ambiente de demonstração): S3 local
+# (SeaweedFS) em HTTPS, em s3.localhost pelo proxy. A API não depende deles para ficar saudável.
 # Subir: docker compose -f docker/compose.yml up -d --build --wait (ver README).
 # As senhas abaixo são de desenvolvimento; a API recusa iniciar com elas em prod (001/R2.3).
 #
@@ -9,6 +11,13 @@
 # a subnet inteira nem o gateway da bridge são confiáveis. SGS_BORDA_SUBNET e SGS_BORDA_PROXY_IP
 # são obrigatórias (o compose não sobe sem elas) e cada stack no mesmo host usa uma subnet
 # própria; valores de desenvolvimento em docker/.env (ver .env.example e README).
+# Spec 004 (D004-13): `integracoes` (interna) liga a API aos serviços de laboratório; `exposicao`
+# liga o proxy a eles. Proxy e API continuam só com a `borda` em comum (013/R3.1).
+#
+# Endereços públicos (specs 004 e 005): SGS_PUBLIC_URL (padrão https://localhost),
+# SGS_PUBLIC_KEYCLOAK_URL (padrão https://keycloak.localhost) e SGS_PUBLIC_S3_URL (padrão
+# https://s3.localhost) alimentam ao mesmo tempo os serviços e a API. Com SGS_HTTPS_PORT diferente
+# de 443, as três levam a porta (README).
 name: sgs-api
 
 services:
@@ -21,6 +30,17 @@ services:
     volumes:
       - db-certs:/certs
       - ./postgres/gerar-certificados.sh:/gerar-certificados.sh:ro
+
+  # TLS dos serviços de laboratório (spec 004, design § Certificados; compartilhado com a 005): na
+  # subida, gera no volume servicos-certs, se faltarem, a CA de laboratório e os certificados de
+  # ldap, keycloak e s3. Separado do db-certs (D004-8). Detalhes no script.
+  servicos-certs:
+    image: alpine:3.23
+    command: ["sh", "/gerar-certificados.sh"]
+    networks: [exposicao]
+    volumes:
+      - servicos-certs:/certs
+      - ./servicos/gerar-certificados.sh:/gerar-certificados.sh:ro
 
   db:
     image: postgres:17
@@ -67,7 +87,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    networks: [borda, dados]
+    networks: [borda, dados, integracoes]
     environment:
       APP_ENV: dev
       # Só o IP fixo do proxy pode informar o IP do cliente (013/R3.1; lido pelo uvicorn).
@@ -87,7 +107,49 @@ services:
       CRYPTO_ACTIVE_KEY: "1"
       # O front em HTML, quando servido pelo proxy no mesmo domínio (anti-CSRF do refresh).
       # Origens aceitas no refresh (anti-CSRF, 002/R3.6); trocável junto com as portas do proxy.
-      CORS_ORIGINS: ${SGS_CORS_ORIGINS:-https://localhost,https://localhost:3000}
+      CORS_ORIGINS: ${SGS_CORS_ORIGINS:-${SGS_PUBLIC_URL:-https://localhost},https://localhost:3000}
+      # OIDC do laboratório (spec 004, design § Configuração). O `iss` é o endereço público; a
+      # descoberta, o JWKS e o token vão direto ao Keycloak pela rede `integracoes`, com a CA de
+      # laboratório. O segredo de exemplo é recusado em prod (004/R5.4).
+      OIDC_ISSUER: ${SGS_PUBLIC_KEYCLOAK_URL:-https://keycloak.localhost}/realms/sgs
+      OIDC_DISCOVERY_URL: https://keycloak:8443/realms/sgs/.well-known/openid-configuration
+      OIDC_CA_FILE: /certs-servicos/ca.crt
+      OIDC_CLIENT_ID: sgs-api
+      OIDC_CLIENT_SECRET: sgs-lab-exemplo-oidc
+      OIDC_REDIRECT_URI: ${SGS_PUBLIC_URL:-https://localhost}/api/v1/auth/oidc/callback
+      FRONTEND_URL: ${SGS_PUBLIC_URL:-https://localhost}/
+      OIDC_GROUPS_CLAIM: groups
+      # LDAP do laboratório (spec 004, design § Configuração): LDAPS pela rede `integracoes`,
+      # conferido pela CA de laboratório. A senha de exemplo é recusada em prod (004/R5.4).
+      LDAP_URL: ldaps://ldap:636
+      LDAP_START_TLS: "false"
+      LDAP_CA_FILE: /certs-servicos/ca.crt
+      LDAP_BIND_DN: cn=sgs-sync,ou=servicos,dc=recife,dc=pe,dc=gov,dc=br
+      LDAP_BIND_PASSWORD: sgs-lab-exemplo-bind
+      LDAP_USER_BASE: ou=pessoas,dc=recife,dc=pe,dc=gov,dc=br
+      LDAP_USER_FILTER: (objectClass=inetOrgPerson)
+      LDAP_GROUP_BASE: ou=grupos,dc=recife,dc=pe,dc=gov,dc=br
+      LDAP_GROUP_FILTER: (objectClass=groupOfNames)
+      LDAP_ATTR_LOGIN: uid
+      LDAP_ATTR_EMAIL: mail
+      LDAP_ATTR_NAME: cn
+      LDAP_ATTR_ID: entryUUID
+      LDAP_ATTR_MEMBER: member
+      # S3 do laboratório (spec 005, design § Configuração): envio direto ao SeaweedFS pela rede
+      # `integracoes`, em HTTPS conferido pela CA de laboratório (R2.7); as URLs de download saem
+      # no endereço público, assinadas para o host que o navegador usa (R3.6, D005-3). As chaves
+      # fixas de exemplo são recusadas em prod (R2.9).
+      S3_BUCKET: sgs-relatorios
+      S3_REGION: us-east-1
+      S3_ENDPOINT_URL: https://s3:8333
+      S3_PUBLIC_ENDPOINT_URL: ${SGS_PUBLIC_S3_URL:-https://s3.localhost}
+      S3_CA_FILE: /certs-servicos/ca.crt
+      S3_ADDRESSING_STYLE: path
+      S3_SSE: AES256
+      S3_ACCESS_KEY_ID: sgs-lab-exemplo
+      S3_SECRET_ACCESS_KEY: sgs-lab-exemplo-s3
+      # Chave de assinatura dos relatórios (spec 005, R5), outra que a JWT (ver README).
+      REPORT_SIGNING_KEYS_FILE: /run/secrets/report-keys.json
     volumes:
       # Só o certificado da CA. O usuário da API tem o mesmo uid do postgres (999); por isso a
       # chave do servidor não pode ser montada aqui.
@@ -97,13 +159,24 @@ services:
         read_only: true
         volume:
           subpath: ca
+      # Só a CA de laboratório (LDAP, Keycloak e S3).
+      - type: volume
+        source: servicos-certs
+        target: /certs-servicos
+        read_only: true
+        volume:
+          subpath: ca
     secrets:
       - source: jwt_keys
         target: jwt-keys.json
       - source: crypto_keys
         target: crypto-keys.json
+      - source: report_keys
+        target: report-keys.json
     depends_on:
       db-certs:
+        condition: service_completed_successfully
+      servicos-certs:
         condition: service_completed_successfully
       db:
         condition: service_healthy
@@ -121,11 +194,183 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # Diretório LDAP de laboratório (spec 004, R5.1; design § `slapd`): OpenLDAP só com LDAPS (636)
+  # e ldapi, sem porta no host; a API chega a ele pela rede `integracoes`. A carga inicial
+  # (docker/ldap/seed.ldif) entra na primeira subida e fica no volume ldap-data; para recomeçar
+  # do arquivo, apague o volume. Usuários, grupos e senhas no README. O alias `ldap-nome-errado`
+  # chega ao mesmo servidor por um nome fora do certificado: serve só ao teste da R1.13.
+  ldap:
+    build:
+      context: ./ldap
+    networks:
+      integracoes:
+        aliases: [ldap-nome-errado]
+    volumes:
+      - ldap-data:/var/lib/ldap
+      # Certificado e chave do servidor (a chave tem o uid 389 do usuário do contêiner).
+      - type: volume
+        source: servicos-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: ldap
+      # A CA de laboratório, só para os ldap-utils de dentro do contêiner (testes e roteiro).
+      - type: volume
+        source: servicos-certs
+        target: /certs-servicos
+        read_only: true
+        volume:
+          subpath: ca
+    depends_on:
+      servicos-certs:
+        condition: service_completed_successfully
+    # Pronto quando o slapd final escuta a 636 (027C): a carga inicial roda antes, só no ldapi.
+    # Sem operação LDAP, para não encher o log das operações a cada verificação.
+    healthcheck:
+      test:
+        - CMD
+        - awk
+        - $$4 == "0A" && $$2 ~ /:027C$$/ {ok = 1} END {exit !ok}
+        - /proc/net/tcp
+        - /proc/net/tcp6
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # Provedor OIDC de laboratório (spec 004, R5.2; design § Keycloak), sem porta no host: o
+  # navegador chega pelo proxy (keycloak.localhost) e a API direto, pela rede `integracoes`.
+  # Realm `sgs` importado na primeira subida; usuários, grupos e senhas no README. Modo `start`, não
+  # `start-dev`: o perfil dev abre HTTP em 8080 mesmo com KC_HTTP_ENABLED=false. Banco H2 local
+  # (dev-file), descartado com o contêiner; o realm volta do arquivo.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start", "--import-realm"]
+    networks: [integracoes, exposicao]
+    environment:
+      KC_DB: dev-file
+      # `iss` e endpoint de autorização públicos; descoberta, JWKS e token pedidos em
+      # https://keycloak:8443 voltam com endereços internos (backchannel dinâmico).
+      KC_HOSTNAME: ${SGS_PUBLIC_KEYCLOAK_URL:-https://keycloak.localhost}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_CERTIFICATE_FILE: /certs/server.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /certs/server.key
+      # Saúde só no loopback do contêiner, em HTTP, para o healthcheck.
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_SCHEME: http
+      KC_HTTP_MANAGEMENT_HOST: 127.0.0.1
+      # Administrador só do laboratório (console em keycloak.localhost/admin).
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: sgs-lab-exemplo-admin
+      # Lido pelo realm-sgs.json (redirect URI exata do cliente sgs-api).
+      SGS_PUBLIC_URL: ${SGS_PUBLIC_URL:-https://localhost}
+    volumes:
+      - ./keycloak/realm-sgs.json:/opt/keycloak/data/import/realm-sgs.json:ro
+      - type: volume
+        source: servicos-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: keycloak
+    depends_on:
+      servicos-certs:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q ' 200 ' <&3
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  # S3 local (spec 005, R6.1; design § Ambiente de demonstração), sem porta no host: a API envia
+  # pela rede `integracoes` e o navegador baixa pelo proxy, em s3.localhost (R6.2). Tag e digest
+  # fixos, os conferidos na 005/T10. HTTPS direto na 8333, com o certificado `s3` do
+  # servicos-certs. A SSE-S3 (AES256, R2.8) exige uma chave: vem do segredo `s3_security`
+  # (security.toml com [s3.sse] key, gerado em secrets/; decisão do Rafael, 26/11/2026), nunca de
+  # variável de ambiente. Iceberg e Lance (HTTP) e a telemetria ficam desligados.
+  # A identidade da API (docker/seaweedfs/s3.json) só lê, grava e lista o bucket.
+  s3:
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+    command:
+      - server
+      - -dir=/data
+      # O `s3` está em duas redes: anuncia o nome do serviço, que as duas resolvem, e não o IP
+      # de uma delas (o `s3-init`, só na `integracoes`, não chegaria ao master).
+      - -ip=s3
+      - -ip.bind=0.0.0.0
+      - -master.telemetry=false
+      - -s3
+      - -s3.port=8333
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.cert.file=/certs/server.crt
+      - -s3.key.file=/certs/server.key
+    networks: [integracoes, exposicao]
+    volumes:
+      - s3-data:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - type: volume
+        source: servicos-certs
+        target: /certs
+        read_only: true
+        volume:
+          subpath: s3
+    secrets:
+      - source: s3_security
+        target: /etc/seaweedfs/security.toml
+    depends_on:
+      servicos-certs:
+        condition: service_completed_successfully
+    # Pronto quando o S3 escuta a 8333 (208D), sem requisição (que pediria assinatura).
+    healthcheck:
+      test:
+        - CMD
+        - awk
+        - $$4 == "0A" && $$2 ~ /:208D$$/ {ok = 1} END {exit !ok}
+        - /proc/net/tcp
+        - /proc/net/tcp6
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  # Cria o bucket e liga o versionamento (a remoção pela versão da R2.8), sem erro se já existir
+  # (R6.1). One-shot, pelo `weed shell` no master do `s3`, sem passar pela identidade da API.
+  s3-init:
+    image: chrislusf/seaweedfs:4.53@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        set -eu;
+        if ! echo s3.bucket.list | weed shell -master=s3:9333 | grep -qw sgs-relatorios; then
+        echo 's3.bucket.create -name sgs-relatorios' | weed shell -master=s3:9333; fi;
+        echo 's3.bucket.versioning -name sgs-relatorios -enable' | weed shell -master=s3:9333;
+        echo 's3.bucket.versioning -name sgs-relatorios' | weed shell -master=s3:9333
+        | grep -q 'Versioning: Enabled'
+    networks: [integracoes]
+    depends_on:
+      s3:
+        condition: service_healthy
+
   proxy:
     image: caddy:2
     networks:
       borda:
         ipv4_address: ${SGS_BORDA_PROXY_IP:?defina SGS_BORDA_PROXY_IP (ver README)}
+      exposicao: {}
     ports:
       # Portas do host trocáveis (padrão 80 e 443), para testes e2e em máquinas com elas ocupadas.
       - "${SGS_HTTP_PORT:-80}:80"
@@ -136,9 +381,18 @@ services:
       - ../frontend/app:/srv/frontend:ro
       - caddy-data:/data
       - caddy-config:/config
+      # Só a CA de laboratório, para conferir o certificado do Keycloak e do S3.
+      - type: volume
+        source: servicos-certs
+        target: /certs-servicos
+        read_only: true
+        volume:
+          subpath: ca
     depends_on:
       api:
         condition: service_healthy
+      servicos-certs:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 networks:
@@ -147,15 +401,25 @@ networks:
       config:
         - subnet: ${SGS_BORDA_SUBNET:?defina SGS_BORDA_SUBNET (ver README)}
   dados: {}
+  integracoes:
+    internal: true
+  exposicao: {}
 
 secrets:
   jwt_keys:
     file: ../secrets/jwt-keys.json
   crypto_keys:
     file: ../secrets/crypto-keys.json
+  report_keys:
+    file: ../secrets/report-keys.json
+  s3_security:
+    file: ../secrets/s3-security.toml
 
 volumes:
   db-data:
   db-certs:
+  servicos-certs:
+  ldap-data:
+  s3-data:
   caddy-data:
   caddy-config:
