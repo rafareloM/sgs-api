@@ -61,7 +61,8 @@ Pontos de encontro desta spec:
   - Bloqueada por: —
   - Requisitos: R2.8, R6.1 (verificação de viabilidade)
   - Pronto quando: o resultado (tag, comandos, resposta) está registrado no design § Riscos. Se a SSE não vier confirmada, a frente C para e a decisão volta ao dono (G1).
-- [ ] T12. Filtros e comparação de escopo (domínio puro)
+- [x] T12. Filtros e comparação de escopo (domínio puro)
+  - Concluída em 26/11/2026 (`make check` verde). Prova: `tests/unit/reports/test_filtros.py`, `tests/unit/reports/test_escopo_cobre.py`
   - Frente: C
   - Faz:
     - modelos dos filtros por tipo, com o período da trilha de até 366 dias;
