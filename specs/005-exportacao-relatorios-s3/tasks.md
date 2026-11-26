@@ -49,7 +49,8 @@ Pontos de encontro desta spec:
   - Frente: base
   - Requisitos: — (infraestrutura das tarefas seguintes)
   - Pronto quando: `uv.lock` travado, `tests/unit/core/test_errors.py::test_service_unavailable_responde_503` passa e o `make check` está verde
-- [ ] T10. Conferência antecipada do SeaweedFS, sem mudar o repositório
+- [x] T10. Conferência antecipada do SeaweedFS, sem mudar o repositório
+  - Concluída em 26/11/2026 (`make check` verde). Prova: registro em `design.md` § Riscos, "Conferência antecipada do SeaweedFS"
   - Frente: C
   - Faz:
     - sobe a imagem `chrislusf/seaweedfs` na tag que a T8 vai fixar, com o S3 em HTTPS (certificado de teste);
