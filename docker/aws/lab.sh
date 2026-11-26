@@ -11,8 +11,9 @@
 # Variáveis opcionais:
 #   SGS_LAB_IPS         CIDRs que podem abrir a 443, separados por vírgula (padrão: o seu IP/32)
 #   SGS_LAB_COMMIT      commit que a instância clona (padrão: HEAD; precisa estar no GitHub)
-#   SGS_LAB_TIPO        tipo da instância (padrão: t3.small)
+#   SGS_LAB_TIPO        tipo da instância (padrão: t3.small, com créditos de CPU unlimited)
 #   SGS_LAB_REPOSITORIO repositório que a instância clona
+#   SGS_LAB_SENHA_ADMIN_ARQUIVO  senha do admin do lab, para a evidência (padrão: ~/.config/sgs-lab/senha-admin)
 set -Eeuo pipefail
 shopt -s inherit_errexit
 
@@ -40,6 +41,7 @@ uso() {
 		  estado               mostra instância, endereços, lista da 443, bucket e o progresso da subida
 		  liberar-ip           troca a lista de IPs da 443 (SGS_LAB_IPS ou o seu IP)
 		  parar | ligar        para ou liga a instância (o IP elástico fica)
+		  evidencia            confere o laboratório no ar e grava docs/operacao/evidencias/laboratorio-aws-<data>.json
 		  destruir --confirmo  apaga a instância, o IP, o bucket (com todas as versões) e o grupo
 	FIM
 }
@@ -349,7 +351,7 @@ preparar_bucket() {
 		fi
 	fi
 	aws_ s3api put-bucket-tagging --bucket "$BUCKET" \
-		--tagging "TagSet=[{Key=${ETIQUETA_CHAVE},Value=${ETIQUETA_VALOR}}]"
+		--tagging "TagSet=[{Key=${ETIQUETA_CHAVE},Value=${ETIQUETA_VALOR}}]" >/dev/null
 	aws_ s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration \
 		BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 	aws_ s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
@@ -358,7 +360,7 @@ preparar_bucket() {
 			'{Rules: [{ApplyServerSideEncryptionByDefault: {SSEAlgorithm: "aws:kms", KMSMasterKeyID: $k}}]}')"
 	aws_ s3api put-bucket-policy --bucket "$BUCKET" --policy "$(politica_do_bucket "$BUCKET")"
 	aws_ s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" \
-		--lifecycle-configuration "$(ciclo_de_vida)"
+		--lifecycle-configuration "$(ciclo_de_vida)" >/dev/null
 	ok "bucket $BUCKET: privado, versionado, aws:kms (aws/s3), TLS obrigatório, guarda de ${RETENCAO_DIAS} dias"
 }
 
@@ -438,7 +440,7 @@ subir() {
 		--iam-instance-profile "Name=$PERFIL_DA_INSTANCIA" --security-group-ids "$GRUPO_ID" \
 		--user-data "file://$temp/user-data.sh" \
 		--metadata-options HttpTokens=required,HttpPutResponseHopLimit=2,HttpEndpoint=enabled \
-		--credit-specification CpuCredits=standard \
+		--credit-specification CpuCredits=unlimited \
 		--block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":${DISCO_GIB},\"VolumeType\":\"gp3\",\"Encrypted\":true,\"DeleteOnTermination\":true}}]" \
 		--tag-specifications \
 		"$(etiquetas instance ",{Key=Name,Value=sgs-lab},{Key=SgsBucket,Value=${BUCKET}}")" \
@@ -599,6 +601,379 @@ destruir() {
 	ok "nada do laboratório ficou na conta"
 }
 
+# --- evidencia ------------------------------------------------------------------------------------
+# Roda do computador de quem demonstra (o IP dele está na lista da 443), contra o laboratório no ar.
+# Só bash, curl, jq, python3 e AWS CLI. Nenhum token, senha ou URL assinada vai para a tela ou
+# para o arquivo de evidência; os tokens vão para o curl por arquivo (-H @arquivo), não pela
+# linha de comando.
+
+CONFIG_DO_LAB="${SGS_LAB_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/sgs-lab}"
+SENHA_DE_EXEMPLO_DO_LAB="sgs-lab-exemplo-usuario"
+
+# Código TOTP (RFC 6238: SHA-1, 6 dígitos, 30 s) de uma URI otpauth://, só com a biblioteca padrão.
+# O segundo argumento, opcional, fixa o instante (usado nos testes).
+totp() {
+	python3 -I - "$@" <<-'PY'
+		import base64, hashlib, hmac, struct, sys, time, urllib.parse as u
+		segredo = u.parse_qs(u.urlsplit(sys.argv[1]).query)["secret"][0].upper()
+		chave = base64.b32decode(segredo + "=" * (-len(segredo) % 8))
+		instante = int(sys.argv[2]) if len(sys.argv) > 2 else int(time.time())
+		resumo = hmac.new(chave, struct.pack(">Q", instante // 30), hashlib.sha1).digest()
+		inicio = resumo[-1] & 0x0F
+		numero = struct.unpack(">I", resumo[inicio:inicio + 4])[0] & 0x7FFFFFFF
+		print(f"{numero % 1_000_000:06d}")
+	PY
+}
+
+# Tira do texto da evidência o id da conta, o IP do laboratório (com pontos ou traços) e qualquer
+# parâmetro de assinatura que escape por engano.
+sanitizar_evidencia() {
+	local ip="$1" tracos
+	tracos="${ip//./-}"
+	mascarar | sed -E \
+		-e "s/${ip//./\\.}/<IP_DO_LAB>/g" \
+		-e "s/${tracos}/<IP_DO_LAB>/g" \
+		-e 's/X-Amz-[A-Za-z-]+=[^&"]*/X-Amz-<OMITIDO>/g'
+}
+
+# Chamada à API do laboratório. Imprime o corpo; o status HTTP fica em "$TEMP_EV/status".
+# $1 método, $2 caminho (sem /api/v1), $3 corpo JSON opcional, $4 arquivo de autorização opcional.
+api_lab() {
+	local -a args=(-sS -X "$1" -o "$TEMP_EV/resposta" -w '%{http_code}' -c "$JARRO" -b "$JARRO"
+		-H 'Accept: application/json')
+	if [[ -n "${3:-}" ]]; then
+		printf '%s' "$3" >"$TEMP_EV/corpo"
+		args+=(-H 'Content-Type: application/json' --data-binary "@$TEMP_EV/corpo")
+	fi
+	[[ -z "${4:-}" ]] || args+=(-H "@$4")
+	curl "${args[@]}" "https://${HOST_EV}/api/v1$2" >"$TEMP_EV/status" || echo 000 >"$TEMP_EV/status"
+	rm -f "$TEMP_EV/corpo"
+	cat "$TEMP_EV/resposta"
+}
+
+status_http() { cat "$TEMP_EV/status"; }
+
+# Guarda o access token num arquivo de cabeçalho e devolve o caminho.
+cabecalho_de() {
+	local arquivo="$TEMP_EV/aut-$1"
+	(
+		umask 077
+		printf 'Authorization: Bearer %s\n' "$2" >"$arquivo"
+	)
+	printf '%s' "$arquivo"
+}
+
+# Login da spec 002 com 2FA. Cadastra o 2FA no primeiro acesso e guarda a URI em
+# $CONFIG_DO_LAB/<usuario>.totp (0600), para os acessos seguintes. Imprime o access token.
+entrar() {
+	local usuario="$1" senha="$2" provedor="$3" login desafio uri arquivo_uri corpo
+	arquivo_uri="$CONFIG_DO_LAB/${usuario}.totp"
+	corpo="$(jq -cn --arg u "$usuario" --arg p "$senha" --arg pr "$provedor" \
+		'{username: $u, password: $p, provider: $pr}')"
+	login="$(api_lab POST /auth/login "$corpo")"
+	if [[ "$(status_http)" != 200 ]]; then
+		falha "login de $usuario ($provedor): HTTP $(status_http)" >&2
+		return 1
+	fi
+	desafio="$(jq -r .mfa_token <<<"$login")"
+	if [[ "$(jq -r .mfa_enrollment_required <<<"$login")" == "true" ]]; then
+		uri="$(api_lab POST /auth/mfa/enroll "$(jq -cn --arg t "$desafio" '{mfa_token: $t}')" | jq -r .otpauth_uri)"
+		(
+			umask 077
+			mkdir -p "$CONFIG_DO_LAB"
+			printf '%s\n' "$uri" >"$arquivo_uri"
+		)
+		api_lab POST /auth/mfa/confirm \
+			"$(jq -cn --arg t "$desafio" --arg c "$(totp "$uri")" '{mfa_token: $t, code: $c}')" |
+			jq -r .access_token
+	elif [[ -s "$arquivo_uri" ]]; then
+		api_lab POST /auth/mfa/verify \
+			"$(jq -cn --arg t "$desafio" --arg c "$(totp "$(cat "$arquivo_uri")")" '{mfa_token: $t, code: $c}')" |
+			jq -r .access_token
+	else
+		falha "$usuario já tem 2FA, mas não há $arquivo_uri: não consigo gerar o código" >&2
+		return 1
+	fi
+}
+
+# Login OIDC sem navegador: início na API, formulário do Keycloak, callback e renovação pelo
+# cookie de refresh (com o anti-CSRF da 002). Imprime um JSON com o resultado e o access token.
+entrar_oidc() {
+	local usuario="$1" jarro_oidc="$TEMP_EV/jarro-oidc" pagina acao volta destino token
+	rm -f "$jarro_oidc"
+	local -a curl_oidc=(-sS -c "$jarro_oidc" -b "$jarro_oidc")
+	pagina="$(curl "${curl_oidc[@]}" -o /dev/null -w '%{redirect_url}' "https://${HOST_EV}/api/v1/auth/oidc/login")"
+	if [[ "$pagina" != "https://keycloak.${HOST_EV}/"* ]]; then
+		jq -cn '{inicio_vai_ao_keycloak: false}'
+		return 0
+	fi
+	acao="$(curl "${curl_oidc[@]}" "$pagina" | python3 -I -c '
+import html, re, sys
+achado = re.search(r"<form[^>]*id=\"kc-form-login\"[^>]*action=\"([^\"]+)\"", sys.stdin.read())
+print(html.unescape(achado.group(1)) if achado else "")')"
+	volta="$(curl "${curl_oidc[@]}" -o /dev/null -w '%{redirect_url}' \
+		--data-urlencode "username=$usuario" --data-urlencode "password=$SENHA_DE_EXEMPLO_DO_LAB" \
+		--data-urlencode "credentialId=" "$acao")"
+	destino="$(curl "${curl_oidc[@]}" -o /dev/null -w '%{http_code} %{redirect_url}' "$volta")"
+	token="$(curl "${curl_oidc[@]}" -X POST -H 'X-Requested-With: sgs' -H "Origin: https://${HOST_EV}" \
+		"https://${HOST_EV}/api/v1/auth/refresh" | jq -r '.access_token // empty')"
+	jq -cn --arg volta "$volta" --arg destino "$destino" --arg token "$token" --arg host "$HOST_EV" '{
+		inicio_vai_ao_keycloak: true,
+		keycloak_volta_ao_callback: ($volta | startswith("https://\($host)/api/v1/auth/oidc/callback")),
+		callback_status: ($destino | split(" ")[0] | tonumber),
+		callback_volta_ao_front_sem_erro: (($destino | split(" ")[1]) == "https://\($host)/"),
+		token_pela_renovacao: ($token != ""),
+		token: $token}'
+}
+
+resumo_do_me() {
+	jq -c '{username, origem, papeis: [(.papeis // [])[] | {papel, origem, escopo_tipo}]}'
+}
+
+grupo_id() {
+	api_lab GET "/admin/diretorio/grupos?origem=$1&busca=$2" "" "$3" |
+		jq -r --arg n "$2" '[.itens[] | select(.nome == $n)][0].id // empty'
+}
+
+# Mapeia um grupo para GESTOR_DADOS (escopo global), se ainda não estiver mapeado.
+mapear_gestor_dados() {
+	local grupo="$1" autorizacao="$2"
+	if api_lab GET /admin/mapeamentos-grupo "" "$autorizacao" |
+		jq -e --arg g "$grupo" '[(.itens // .)[] | select(.grupo_id == $g and .papel == "GESTOR_DADOS")] | length > 0' >/dev/null; then
+		return 0
+	fi
+	api_lab POST /admin/mapeamentos-grupo \
+		"$(jq -cn --arg g "$grupo" '{grupo_id: $g, papel: "GESTOR_DADOS", escopo_tipo: "global"}')" \
+		"$autorizacao" >/dev/null
+	[[ "$(status_http)" == 201 || "$(status_http)" == 200 ]]
+}
+
+esperar_status() { # caminho, autorização, jq dos estados finais; imprime o último corpo
+	local corpo tentativa
+	for tentativa in $(seq 1 "${SGS_LAB_TENTATIVAS:-40}"); do
+		corpo="$(api_lab GET "$1" "" "$2")"
+		if jq -e "$3" <<<"$corpo" >/dev/null 2>&1; then
+			printf '%s' "$corpo"
+			return 0
+		fi
+		((tentativa == 1)) || sleep "${SGS_LAB_ESPERA:-3}"
+	done
+	printf '%s' "$corpo"
+}
+
+evidencia() {
+	precisa aws jq curl python3
+	exigir_credenciais
+	local temp
+	temp="$(mktemp -d)"
+	# shellcheck disable=SC2064 # o caminho da pasta é fixado agora, de propósito
+	trap "rm -rf '$temp'" EXIT
+	TEMP_EV="$temp"
+	JARRO="$temp/jarro"
+
+	local ip bucket senha_admin arquivo_senha
+	ip="$(ip_do_lab)"
+	bucket="$(bucket_do_lab)"
+	if [[ -z "$ip" || -z "$bucket" ]]; then
+		falha "o laboratório não está no ar (use 'lab.sh subir' e 'lab.sh estado')"
+		return 1
+	fi
+	IP_EV="$(jq -r .PublicIp <<<"$ip")"
+	HOST_EV="$(host_do_ip "$IP_EV")"
+	arquivo_senha="${SGS_LAB_SENHA_ADMIN_ARQUIVO:-$CONFIG_DO_LAB/senha-admin}"
+	if [[ ! -s "$arquivo_senha" ]]; then
+		falha "falta a senha do administrador do laboratório em $arquivo_senha"
+		nota "Ela só existe na instância: EC2 Instance Connect, 'sudo cat /opt/sgs/credenciais-do-lab'."
+		nota "Grave só a senha (linha 'admin:') nesse arquivo, com permissão 0600."
+		return 1
+	fi
+	senha_admin="$(head -n1 "$arquivo_senha")"
+	local -a falhas=()
+	confere() { # descrição, condição jq, json
+		if jq -e "$2" <<<"$3" >/dev/null 2>&1; then ok "$1"; else
+			falha "$1"
+			falhas+=("$1")
+		fi
+	}
+
+	# 1. TLS público (Let's Encrypt) no endereço do laboratório.
+	local tls
+	tls="$(python3 -I - "$HOST_EV" <<-'PY'
+		import json, socket, ssl, sys
+		host = sys.argv[1]
+		try:
+		    with socket.create_connection((host, 443), timeout=10) as bruto:
+		        with ssl.create_default_context().wrap_socket(bruto, server_hostname=host) as tls:
+		            emissor = dict(x[0] for x in tls.getpeercert()["issuer"])
+		    print(json.dumps({"certificado_confiavel": True, "emissor": emissor.get("organizationName")}))
+		except (OSError, ssl.SSLError) as erro:
+		    print(json.dumps({"certificado_confiavel": False, "erro": type(erro).__name__}))
+	PY
+	)"
+	confere "TLS público em https://<host>/ (certificado conferido pelas CAs do sistema)" '.certificado_confiavel' "$tls"
+
+	# 2. Administrador local, sincronização LDAP e mapeamentos para GESTOR_DADOS.
+	local admin aut_admin execucao sincronizacao grupo_ldap grupo_oidc
+	admin="$(entrar admin "$senha_admin" local)" || true
+	unset senha_admin
+	if [[ -z "$admin" || "$admin" == "null" ]]; then
+		falha "login do administrador: sem isso não há sincronização nem mapeamento"
+		return 1
+	fi
+	aut_admin="$(cabecalho_de admin "$admin")"
+	execucao="$(api_lab POST /admin/diretorio/sincronizar "" "$aut_admin" | jq -r '.execucao_id // empty')"
+	sincronizacao="$(esperar_status "/admin/diretorio/execucoes/$execucao" "$aut_admin" \
+		'.status != "pendente" and .status != "em_andamento"' | jq -c '{status, usuarios, grupos, conflitos}')"
+	confere "sincronização LDAP concluída (LDAPS, conta de serviço só leitura)" '.status == "concluida"' "$sincronizacao"
+	grupo_ldap="$(grupo_id ldap sgs-gestor-dados "$aut_admin")"
+	[[ -n "$grupo_ldap" ]] && mapear_gestor_dados "$grupo_ldap" "$aut_admin" || true
+
+	# 3. Login LDAP com 2FA: o papel vem do grupo mapeado.
+	local gestor aut_gestor me_ldap
+	gestor="$(entrar ldap.gestor.dados "$SENHA_DE_EXEMPLO_DO_LAB" ldap)" || true
+	aut_gestor="$(cabecalho_de gestor "${gestor:-}")"
+	me_ldap="$(api_lab GET /me "" "$aut_gestor" | resumo_do_me)"
+	confere "login LDAP com 2FA de ldap.gestor.dados, com GESTOR_DADOS do grupo mapeado" \
+		'[.papeis[] | select(.papel == "GESTOR_DADOS")] | length > 0' "$me_ldap"
+
+	# 4. Login OIDC pelo formulário do Keycloak; o grupo do token é espelhado e mapeado.
+	local oidc_1 oidc_2 me_oidc
+	oidc_1="$(entrar_oidc oidc.gestor.dados)"
+	grupo_oidc="$(grupo_id oidc oidc-gestor-dados "$aut_admin")"
+	[[ -n "$grupo_oidc" ]] && mapear_gestor_dados "$grupo_oidc" "$aut_admin" || true
+	oidc_2="$(entrar_oidc oidc.gestor.dados)"
+	me_oidc="$(api_lab GET /me "" "$(cabecalho_de oidc "$(jq -r .token <<<"$oidc_2")")" | resumo_do_me)"
+	confere "login OIDC de oidc.gestor.dados (Keycloak, callback, refresh), sem token na URL" \
+		'.inicio_vai_ao_keycloak and .keycloak_volta_ao_callback and .callback_status == 302 and .callback_volta_ao_front_sem_erro and .token_pela_renovacao' "$oidc_2"
+	confere "grupo OIDC oidc-gestor-dados espelhado e mapeado: GESTOR_DADOS no /me" \
+		'[.papeis[] | select(.papel == "GESTOR_DADOS")] | length > 0' "$me_oidc"
+
+	# 5. Exportação: pedido, geração, envio ao bucket real (AssumeRole, aws:kms, SHA-256).
+	local pedido relatorio sha_hex url download sem_assinatura sem_tls
+	pedido="$(api_lab POST /relatorios '{"tipo": "inventario_unidades", "formato": "csv"}' "$aut_gestor" | jq -r '.id // empty')"
+	relatorio="$(esperar_status "/relatorios/$pedido" "$aut_gestor" \
+		'.status == "concluido" or .status == "falhou" or .status == "interrompido"' |
+		jq -c '{id, tipo, formato, status, tamanho_bytes, erro, integridade}')"
+	confere "relatório exportado para o bucket real (status concluido, com integridade)" \
+		'.status == "concluido" and .integridade.sha256 != null' "$relatorio"
+	sha_hex="$(jq -r '.integridade.sha256 // ""' <<<"$relatorio")"
+	url="$(api_lab GET "/relatorios/$pedido/download" "" "$aut_gestor" | jq -r '.url // empty')"
+	download="$(curl -sS -o "$temp/relatorio" -w '%{http_code}' "$url" || echo 000)"
+	download="$(jq -cn --arg s "$download" --arg h "$(sha256sum "$temp/relatorio" 2>/dev/null | cut -d' ' -f1)" \
+		--arg e "$sha_hex" --arg u "$url" '{status: ($s | tonumber), sha256_confere: ($h == $e),
+		url_na_aws: ($u | test("^https://[^/]+\\.s3\\.[a-z0-9-]+\\.amazonaws\\.com/"))}')"
+	confere "download pela URL pré-assinada (200) com o SHA-256 da integridade" \
+		'.status == 200 and .sha256_confere and .url_na_aws' "$download"
+	sem_assinatura="$(curl -sS -o "$temp/sem" -w '%{http_code}' "${url%%\?*}" || echo 000)"
+	sem_assinatura="$(jq -cn --arg s "$sem_assinatura" --arg c "$(grep -o '<Code>[^<]*' "$temp/sem" | cut -c7-)" \
+		'{status: ($s | tonumber), codigo: $c}')"
+	confere "a mesma URL sem a assinatura é recusada (AccessDenied)" \
+		'.status == 403 and .codigo == "AccessDenied"' "$sem_assinatura"
+	sem_tls="$(curl -sS -o "$temp/http" -w '%{http_code}' "http://${url#https://}" || echo 000)"
+	sem_tls="$(jq -cn --arg s "$sem_tls" --arg c "$(grep -o '<Code>[^<]*' "$temp/http" | cut -c7-)" \
+		'{status: ($s | tonumber), codigo: $c}')"
+	confere "a URL assinada por HTTP, sem TLS, é recusada pela política do bucket" \
+		'.status == 403 and .codigo == "AccessDenied"' "$sem_tls"
+	# Endereço virtual (bucket no nome do host): o caminho da URL é a chave do objeto.
+	local chave_objeto
+	chave_objeto="$(python3 -I -c 'import sys, urllib.parse as u; print(u.unquote(u.urlsplit(sys.argv[1]).path.lstrip("/")))' "$url")"
+	unset url
+
+	# 6. O objeto gravado, lido de fora da API: aws:kms na chave aws/s3 e o mesmo SHA-256.
+	local objeto chave_kms
+	chave_kms="$(aws_ kms describe-key --key-id alias/aws/s3 | jq -r .KeyMetadata.Arn)"
+	objeto="$(aws_ s3api head-object --bucket "$bucket" --key "$chave_objeto" --checksum-mode ENABLED 2>/dev/null |
+		jq -c --arg k "$chave_kms" '{ServerSideEncryption, SSEKMSKeyId, ChecksumSHA256, VersionId,
+		chave_e_a_aws_s3: (.SSEKMSKeyId == $k)}' || echo '{}')"
+	objeto="$(python3 -I - "$objeto" "$sha_hex" <<-'PY'
+		import base64, json, sys
+		dados = json.loads(sys.argv[1])
+		soma = dados.get("ChecksumSHA256") or ""
+		dados["sha256_confere"] = bool(soma) and base64.b64decode(soma).hex() == sys.argv[2]
+		print(json.dumps(dados))
+	PY
+	)"
+	confere "objeto no bucket com aws:kms na chave aws/s3 e o mesmo SHA-256 (R2.3, R2.8)" \
+		'.ServerSideEncryption == "aws:kms" and .chave_e_a_aws_s3 and .sha256_confere' "$objeto"
+
+	# 7. A política do bucket recusa envio sem aws:kms, mesmo de quem tem s3:PutObject.
+	local put_sem_kms
+	printf 'evidencia 005/T13\n' >"$temp/sem-kms.txt"
+	if aws_ s3api put-object --bucket "$bucket" --key evidencias/sem-kms.txt --body "$temp/sem-kms.txt" \
+		>/dev/null 2>"$temp/erro-put"; then
+		aws_ s3api delete-object --bucket "$bucket" --key evidencias/sem-kms.txt >/dev/null || true
+		put_sem_kms='{"recusado": false}'
+	else
+		put_sem_kms="$(jq -cn --arg c "$(grep -o '([A-Za-z]*)' "$temp/erro-put" | head -n1 | tr -d '()')" \
+			'{recusado: true, codigo: $c}')"
+	fi
+	confere "PutObject sem aws:kms recusado pela política do bucket" \
+		'.recusado and .codigo == "AccessDenied"' "$put_sem_kms"
+
+	# 8. Configuração do bucket.
+	local configuracao
+	configuracao="$(jq -cn \
+		--argjson bloqueio "$(aws_ s3api get-public-access-block --bucket "$bucket" | jq -c .PublicAccessBlockConfiguration)" \
+		--argjson versao "$(aws_ s3api get-bucket-versioning --bucket "$bucket")" \
+		--argjson cifra "$(aws_ s3api get-bucket-encryption --bucket "$bucket" | jq -c '.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault')" \
+		--argjson ciclo "$(aws_ s3api get-bucket-lifecycle-configuration --bucket "$bucket" | jq -c '[.Rules[] | {ID, Status, Filter, Expiration, NoncurrentVersionExpiration}]')" \
+		--argjson politica "$(aws_ s3api get-bucket-policy --bucket "$bucket" | jq -c '.Policy | fromjson | [.Statement[] | {Sid, Effect}]')" \
+		'{bloqueio_publico: $bloqueio, versionamento: $versao.Status, criptografia_padrao: $cifra, ciclo_de_vida: $ciclo, politica: $politica}')"
+	confere "bucket privado, versionado, aws:kms, guarda de 90 dias e política de TLS e aws:kms" \
+		'(.bloqueio_publico | [.[]] | all) and .versionamento == "Enabled" and .criptografia_padrao.SSEAlgorithm == "aws:kms" and (.ciclo_de_vida | any(.Expiration.Days == 90)) and (.politica | length == 3)' "$configuracao"
+
+	# 9. A identidade do envio: o AssumeRole da API no CloudTrail (sessão sgs-<id>, 900 s).
+	local assume tentativa
+	nota "procurando o AssumeRole da API no CloudTrail (pode levar alguns minutos)..."
+	assume='{}'
+	for tentativa in $(seq 1 "${SGS_LAB_TENTATIVAS_CLOUDTRAIL:-20}"); do
+		assume="$(aws_ cloudtrail lookup-events --max-results 50 \
+			--lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRole |
+			jq -c '[.Events[].CloudTrailEvent | fromjson
+				| select(.requestParameters.roleSessionName // "" | test("^sgs-[0-9a-f-]{36}$"))
+				| {papel: (.requestParameters.roleArn | sub(".*:role/"; "")), sessao: .requestParameters.roleSessionName,
+				   duracao_s: .requestParameters.durationSeconds, external_id_enviado: (.requestParameters.externalId != null),
+				   quem_assumiu: (.userIdentity.arn | sub("/i-[0-9a-f]+$"; "/<INSTANCIA>")), quando: .eventTime}][0] // {}')" ||
+			assume='{}'
+		[[ "$assume" == "{}" ]] || break
+		((tentativa == ${SGS_LAB_TENTATIVAS_CLOUDTRAIL:-20})) || sleep "${SGS_LAB_ESPERA_CLOUDTRAIL:-30}"
+	done
+	confere "envio com AssumeRole na LabRole, sessão sgs-<id>, 900 s, com ExternalId (R2.1)" \
+		'.papel == "LabRole" and .duracao_s == 900 and .external_id_enviado' "$assume"
+
+	# 10. O arquivo da evidência, sem id de conta, sem IP e sem nada assinado.
+	local destino commit
+	commit="$(aws_ ec2 get-console-output --instance-id "$(jq -r .InstanceId <<<"$(instancia_do_lab)")" 2>/dev/null |
+		jq -r '.Output // ""' | grep -o 'código em [^ ]* ([0-9a-f]*)' | tail -n1 | grep -o '([0-9a-f]*)' | tr -d '()' || true)"
+	destino="$RAIZ/docs/operacao/evidencias/laboratorio-aws-$(date +%F).json"
+	mkdir -p "$(dirname "$destino")"
+	jq -n --arg data "$(date -u +%FT%TZ)" --arg regiao "$REGIAO" --arg commit "${commit:-desconhecido}" \
+		--arg bucket "$bucket" --argjson falhas "$(printf '%s\n' "${falhas[@]}" | jq -R . | jq -cs 'map(select(length > 0))')" \
+		--argjson tls "$tls" --argjson sinc "$sincronizacao" --argjson me_ldap "$me_ldap" \
+		--argjson oidc_1 "$(jq -c 'del(.token)' <<<"$oidc_1")" --argjson oidc_2 "$(jq -c 'del(.token)' <<<"$oidc_2")" \
+		--argjson me_oidc "$me_oidc" --argjson relatorio "$relatorio" --argjson download "$download" \
+		--argjson sem_assinatura "$sem_assinatura" --argjson sem_tls "$sem_tls" --argjson objeto "$objeto" \
+		--argjson put "$put_sem_kms" --argjson bucket_cfg "$configuracao" --argjson assume "$assume" '{
+		tarefa: "005/T13", gerado_em: $data, regiao: $regiao, commit_da_instancia: $commit,
+		conta: "<ID_DA_CONTA> (Learner Lab do AWS Academy)", endereco: "https://<IP_DO_LAB>.sslip.io/",
+		resultado: (if ($falhas | length) == 0 then "tudo conferido" else "com falhas" end), falhas: $falhas,
+		tls_publico: $tls,
+		diretorio: {sincronizacao_ldap: $sinc, login_ldap_2fa: {usuario: "ldap.gestor.dados", me: $me_ldap},
+			login_oidc: {usuario: "oidc.gestor.dados", primeiro_acesso: $oidc_1, depois_do_mapeamento: $oidc_2, me: $me_oidc}},
+		relatorio: $relatorio,
+		s3: {bucket: $bucket, identidade_do_envio: $assume, objeto: $objeto, download_pre_assinado: $download,
+			mesma_url_sem_assinatura: $sem_assinatura, url_assinada_por_http: $sem_tls,
+			put_sem_kms: $put, configuracao_do_bucket: $bucket_cfg}}' |
+		sanitizar_evidencia "$IP_EV" >"$destino"
+	echo
+	if ((${#falhas[@]} == 0)); then
+		ok "evidência gravada em ${destino#"$RAIZ"/}: tudo conferido"
+		return 0
+	fi
+	falha "evidência gravada em ${destino#"$RAIZ"/}, com ${#falhas[@]} falha(s)"
+	return 1
+}
+
 # --- entrada --------------------------------------------------------------------------------------
 
 principal() {
@@ -611,6 +986,7 @@ principal() {
 	liberar-ip) liberar_ip ;;
 	parar) parar ;;
 	ligar) ligar ;;
+	evidencia) evidencia ;;
 	destruir) destruir "$@" ;;
 	*)
 		uso
@@ -619,4 +995,7 @@ principal() {
 	esac
 }
 
-principal "$@"
+# Os testes carregam o script com `source` para chamar as funções; só a execução direta roda.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	principal "$@"
+fi

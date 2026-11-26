@@ -34,6 +34,11 @@ services:
   keycloak:
     environment:
       JAVA_OPTS_KC_HEAP: -Xms128m -Xmx512m
+    # No t3.small, a primeira subida do Keycloak leva uns 5 minutos (2,5 min só no build do
+    # Quarkus, mais o esquema do banco). Na 1ª subida real, em 26/11/2026, os 3 minutos do compose
+    # local não bastaram e o `up --wait` do user-data falhou com o Keycloak ainda iniciando.
+    healthcheck:
+      start_period: 10m
 
   proxy:
     environment:

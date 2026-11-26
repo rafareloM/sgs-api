@@ -13,7 +13,8 @@ Tudo é feito por `docker/aws/lab.sh`, em bash com o AWS CLI v2. Cada recurso le
 
 ## Custo e limites
 - O Learner Lab dá créditos e uma sessão de cerca de 4 horas. Quando a sessão acaba, a instância para sozinha, e as credenciais copiadas deixam de valer.
-- A instância é `t3.small` (2 vCPU, 2 GiB, com 2 GiB de *swap*), com 20 GiB gp3 e créditos de CPU `standard`, para não haver cobrança extra de CPU. Tudo fica no porte do nível gratuito.
+- A instância é `t3.small` (2 vCPU, 2 GiB, com 2 GiB de *swap*), com 20 GiB gp3, no porte do nível gratuito.
+- Os créditos de CPU são `unlimited` (decisão do Rafael, 26/11/2026). Em `standard`, o t3 novo começa sem créditos e fica preso em 20% de CPU: na primeira subida real, o build da API e o do Keycloak não terminaram. Com `unlimited`, o que passa da linha de base na subida custa uns US$ 0,05 por vCPU-hora, tirados dos créditos do lab. Parado, o laboratório fica abaixo da linha de base e não gasta créditos de CPU.
 - O IP elástico custa por hora mesmo com a instância parada (cerca de US$ 0,12 por dia). Ao terminar o semestre, rode `lab.sh destruir --confirmo`.
 - A chave de criptografia é a gerenciada `aws/s3`, sem custo mensal.
 
@@ -91,6 +92,43 @@ docker/aws/lab.sh destruir --confirmo    # apaga instância, IP, bucket (todas a
 ```
 
 Parar mantém tudo. Destruir não tem volta: os relatórios do bucket somem junto.
+
+## 6. Evidência
+`lab.sh evidencia` confere o laboratório no ar, do seu computador (o seu IP tem de estar na lista da 443), e grava `docs/operacao/evidencias/laboratorio-aws-<data>.json`. O arquivo sai sem o id da conta, sem o IP do laboratório e sem token, senha ou URL assinada.
+
+Antes, grave a senha do administrador num arquivo só seu. Ela só existe na instância: pegue-a pela EC2 Instance Connect (`sudo cat /opt/sgs/credenciais-do-lab`, linha `admin:`).
+
+```bash
+mkdir -p ~/.config/sgs-lab && chmod 700 ~/.config/sgs-lab
+(umask 077; read -rsp 'Senha do admin do lab: ' s; echo; printf '%s\n' "$s" > ~/.config/sgs-lab/senha-admin)
+docker/aws/lab.sh evidencia
+```
+
+O que ela confere, nesta ordem:
+1. **TLS público:** o certificado do endereço do laboratório, pelas CAs do sistema.
+2. **Diretório:**
+   - o administrador entra com 2FA e roda a sincronização LDAP;
+   - os grupos `sgs-gestor-dados` (LDAP) e `oidc-gestor-dados` (OIDC) são mapeados para `GESTOR_DADOS`.
+3. **Login LDAP com 2FA** de `ldap.gestor.dados`, com o papel vindo do grupo no `/me`.
+4. **Login OIDC** de `oidc.gestor.dados`, pelo formulário do Keycloak, sem navegador:
+   - início na API, callback e renovação pelo cookie;
+   - nenhum token na URL;
+   - depois do mapeamento, o papel aparece no `/me`.
+5. **Exportação:**
+   - o gestor pede o inventário em CSV, e o pedido fica `concluido`, com integridade;
+   - o download pela URL pré-assinada responde 200, com o mesmo SHA-256;
+   - a mesma URL sem assinatura é recusada, e a URL assinada por HTTP também.
+6. **O objeto no bucket**, lido de fora da API: `aws:kms` na chave `aws/s3` e o mesmo SHA-256.
+7. **A política do bucket** recusa um `PutObject` sem `aws:kms`.
+8. **A configuração do bucket:** bloqueio público, versionamento, criptografia padrão, ciclo de vida e política.
+9. **No CloudTrail, o `AssumeRole` da API na `LabRole`:**
+   - sessão `sgs-<id>`;
+   - 900 s;
+   - com `ExternalId`.
+
+   O CloudTrail pode levar alguns minutos para mostrar o evento.
+
+O 2FA de cada usuário cadastrado pela evidência fica em `~/.config/sgs-lab/<usuário>.totp` (0600), para as execuções seguintes. Para entrar na tela com esses usuários, use a mesma URI num app autenticador.
 
 ## O que muda em relação ao compose local
 | Peça | Local | AWS |

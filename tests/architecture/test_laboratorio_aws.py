@@ -472,8 +472,9 @@ def test_subir_lanca_instancia_pequena_com_perfil_do_lab_e_imdsv2(tmp_path: Path
         instancia["--metadata-options"]
         == "HttpTokens=required,HttpPutResponseHopLimit=2,HttpEndpoint=enabled"
     )
-    # Sem créditos ilimitados: nada de cobrança extra de CPU.
-    assert instancia["--credit-specification"] == "CpuCredits=standard"
+    # Créditos unlimited: em standard, o t3 novo começa sem créditos, fica preso em 20% de CPU e
+    # o Keycloak não termina a 1ª subida (1ª subida real, 26/11/2026; decisão do Rafael).
+    assert instancia["--credit-specification"] == "CpuCredits=unlimited"
     (disco,) = json.loads(str(instancia["--block-device-mappings"]))
     assert disco["Ebs"] == {
         "VolumeSize": 20,
@@ -660,6 +661,69 @@ def test_destruir_apaga_tudo_na_ordem_certa(tmp_path: Path) -> None:
     assert _opcoes(_chamada(chamadas, "s3api delete-bucket")) == {"--bucket": BUCKET_EXISTENTE}
 
 
+# --- evidencia ------------------------------------------------------------------------------------
+
+
+def _funcao_do_lab(*comando: str) -> str:
+    """Carrega o lab.sh com `source` (sem rodar o principal) e chama uma função dele."""
+    script = f'source "{LAB}"; ' + " ".join(f"'{parte}'" for parte in comando)
+    resultado = subprocess.run(  # noqa: S603 - script do próprio repositório
+        [BASH, "-c", script], capture_output=True, text=True, check=True, timeout=30
+    )
+    return resultado.stdout.strip()
+
+
+@pytest.mark.parametrize(("instante", "codigo"), [("59", "287082"), ("1111111109", "081804")])
+def test_totp_segue_os_vetores_da_rfc_6238(instante: str, codigo: str) -> None:
+    # Segredo ASCII "12345678901234567890" da RFC 6238, apêndice B (SHA-1), em base32.
+    uri = "otpauth://totp/sgs:admin?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=sgs"
+    assert _funcao_do_lab("totp", uri, instante) == codigo
+
+
+def test_sanitizar_evidencia_tira_conta_ip_e_assinatura() -> None:
+    texto = (
+        f"conta {CONTA}; ip {IP_ELASTICO}; host https://{HOST}/; "
+        "url https://b.s3.amazonaws.com/k?X-Amz-Signature=abc123&X-Amz-Security-Token=tok&a=1"
+    )
+    saida = _funcao_do_lab("eval", f"printf '%s' \"{texto}\" | sanitizar_evidencia {IP_ELASTICO}")
+
+    assert CONTA not in saida
+    assert IP_ELASTICO not in saida
+    assert HOST not in saida
+    assert "abc123" not in saida
+    assert "tok" not in saida
+    assert "<ID_DA_CONTA>" in saida
+    assert "https://<IP_DO_LAB>.sslip.io/" in saida
+
+
+def test_evidencia_sem_o_laboratorio_no_ar_falha_sem_mexer_em_nada(tmp_path: Path) -> None:
+    resultado, chamadas = _roda_lab(tmp_path, "evidencia")
+
+    assert resultado.returncode == 1
+    assert "não está no ar" in _saida(resultado)
+    assert all(
+        str(op).split()[1].startswith(("get-", "describe-", "list-")) for op in _ops(chamadas)
+    )
+
+
+def test_evidencia_sem_a_senha_do_admin_explica_onde_buscar(tmp_path: Path) -> None:
+    resultado, chamadas = _roda_lab(
+        tmp_path,
+        "evidencia",
+        existe=("instancia_running", "bucket", "ip"),
+        ambiente_extra={"SGS_LAB_CONFIG": str(tmp_path / "config")},
+    )
+
+    saida = _saida(resultado)
+    assert resultado.returncode == 1
+    assert "senha do administrador" in saida
+    assert "/opt/sgs/credenciais-do-lab" in saida
+    assert all(
+        str(op).split()[1].startswith(("get-", "describe-", "list-")) for op in _ops(chamadas)
+    )
+    assert "evidência gravada" not in saida
+
+
 # --- sobreposição do compose e Caddyfile ----------------------------------------------------------
 
 AMBIENTE_DO_LAB = {
@@ -717,6 +781,9 @@ def test_compose_do_lab_sobe_sem_seaweedfs() -> None:
     assert caddyfile["source"] == str(PASTA_AWS / "Caddyfile")
     assert proxy["environment"]["SGS_LAB_HOST"] == HOST
     assert "-Xmx512m" in servicos["keycloak"]["environment"]["JAVA_OPTS_KC_HEAP"]
+    # A primeira subida do Keycloak num t3.small passa de 3 minutos (1ª subida real, 26/11/2026).
+    assert servicos["keycloak"]["healthcheck"]["start_period"] == "10m0s"
+    assert servicos["keycloak"]["healthcheck"]["test"]  # o teste do compose local continua
 
 
 def test_api_do_lab_usa_assume_role_e_kms_sem_chave_fixa(

@@ -22,7 +22,8 @@ BASE=/opt/sgs
 CODIGO="$BASE/sgs-api"
 COMPOSE=(docker compose -f docker/compose.yml -f docker/aws/compose.aws.yml)
 
-log() { printf 'sgs-lab: %s\n' "$*" | tee -a /dev/console; }
+# O cloud-init já manda a saída do user-data para o console; aqui, só a saída padrão.
+log() { printf 'sgs-lab: %s\n' "$*"; }
 trap 'log "ERRO na linha $LINENO; detalhes em /var/log/cloud-init-output.log"' ERR
 
 log "início $(date -u +%FT%TZ), commit ${COMMIT:0:12}"
@@ -71,7 +72,7 @@ cd "$CODIGO"
 log "código em $CODIGO ($(git rev-parse --short HEAD))"
 
 # Sondagem decisiva da T13: aqui a LabRole assume a LabRole.
-if AWS_REGION="$REGIAO" bash docker/aws/lab.sh sondar 2>&1 | sed -u 's/^/sgs-lab: sondar: /' | tee -a /dev/console; then
+if AWS_REGION="$REGIAO" bash docker/aws/lab.sh sondar 2>&1 | sed -u 's/^/sgs-lab: sondar: /'; then
 	log "sondagem na instância: caminho AssumeRole confirmado"
 else
 	log "sondagem na instância FALHOU: a exportação para o S3 não vai funcionar; ver as linhas acima"
