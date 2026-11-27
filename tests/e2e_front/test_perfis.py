@@ -16,6 +16,7 @@ MENUS = {
         "Validações",
         "Qualidade dos dados",
         "Histórico de alterações",
+        "Relatórios",  # spec 014, R1.1: relatorio:export
         "Tabelas de referência",  # R16.1 (emenda funcional 2): regra_validacao:manage global
         "Importar planilha",
     ],
@@ -34,10 +35,11 @@ MENUS = {
         "Validações",
         "Qualidade dos dados",
         "Histórico de alterações",
+        "Relatórios",
     ],
-    "DIRETORIA": ["Início", "Unidades", "Qualidade dos dados"],
-    "AUDITOR": ["Unidades", "Histórico geral", "Verificação da cadeia"],
-    "ADMIN_TI": ["Papéis e atribuições", "Usuários"],
+    "DIRETORIA": ["Início", "Unidades", "Qualidade dos dados", "Relatórios"],
+    "AUDITOR": ["Unidades", "Histórico geral", "Verificação da cadeia", "Relatórios"],
+    "ADMIN_TI": ["Diretório", "Papéis e atribuições", "Usuários"],  # spec 014, R4.1
 }
 
 INICIOS = {
@@ -46,7 +48,7 @@ INICIOS = {
     "COORD_TECNICO": "#/inicio",
     "DIRETORIA": "#/inicio",
     "AUDITOR": "#/historico",
-    "ADMIN_TI": "#/papeis",
+    "ADMIN_TI": "#/diretorio/execucoes",  # spec 014, P3: primeira tela do menu
 }
 
 # Itens sem backend: visíveis e marcados "em desenvolvimento" (R10.1, R13.1, R12.2).

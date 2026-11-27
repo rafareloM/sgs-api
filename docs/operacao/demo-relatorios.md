@@ -1,6 +1,6 @@
 # Demonstração da exportação de relatórios
 
-Roteiro da spec 005 (R6.3; design § Ambiente de demonstração). Mostra, no ambiente local, o pedido de um relatório, a geração em segundo plano, o envio ao S3 local (SeaweedFS) por HTTPS com criptografia e checksum conferidos, o download pelo navegador e a conferência do hash e da assinatura com a chave pública. Leva uns 10 minutos. Sem tela nova (G1): tudo pela API.
+Roteiro da spec 005 (R6.3; design § Ambiente de demonstração). Mostra, no ambiente local, o pedido de um relatório, a geração em segundo plano, o envio ao S3 local (SeaweedFS) por HTTPS com criptografia e checksum conferidos, o download pelo navegador e a conferência do hash e da assinatura com a chave pública. Leva uns 10 minutos. Os passos abaixo usam a API; a mesma demonstração pela tela está em § Pela tela (spec 014).
 
 - **Teste que automatiza o roteiro:** `uv run pytest tests/e2e/test_export_s3.py -m slow`.
 - **Senhas:** as do laboratório (`sgs-lab-exemplo*`) são fixas, versionadas e só locais; a API as recusa em `prod` (R2.9). A senha do usuário que pede o relatório é sua: digite-a quando o comando pedir e não a grave em arquivo.
@@ -86,6 +86,13 @@ Siga [verificar-relatorio.md](verificar-relatorio.md): o hash do arquivo baixado
 sha256sum sgs-inventario_unidades-*.xlsx
 json "$API/relatorios/$ID" -H "$AUT" | jq -r .integridade.sha256
 ```
+
+## Pela tela (spec 014)
+1. Entre como Gestor de Dados e abra **Relatórios** no menu (`#/relatorios`).
+2. Escolha "Inventário de unidades", formato e filtros, e clique **Pedir relatório**. O pedido entra na lista como Pendente e a lista se atualiza sozinha até Concluído (a cada 3 s, por até 2 min; há também o botão Atualizar).
+3. Clique **Baixar**: o navegador baixa o arquivo direto do S3 local (a URL pré-assinada não aparece na tela).
+4. Clique **Detalhes**: o bloco Integridade mostra SHA-256, algoritmo, `kid` e assinatura. **Copiar integridade.json** copia o objeto que o passo 5 usa; o link Chaves públicas abre `/.well-known/relatorios-jwks.json`.
+- **Teste que automatiza:** `uv run pytest -m slow tests/e2e_front/test_relatorios.py`.
 
 ## O que fica de fora do laboratório
 - A conta AWS real (papel, `ExternalId`, KMS) está em [aws-iam-exemplo.md](../architecture/aws-iam-exemplo.md) (005/T7). Em `prod`, a API recusa as chaves fixas deste laboratório e exige `aws:kms` (R2.9).

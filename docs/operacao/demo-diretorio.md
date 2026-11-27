@@ -134,6 +134,12 @@ docker compose -f docker/compose.yml exec api sgs-admin diretorio testar --url l
 - **Esperado:** `ok` no primeiro e recusa por certificado nos outros dois, antes de qualquer *bind*: nenhuma credencial sai da API.
 - **Na sincronização:** a mesma falha numa sincronização marca a execução como `falhou`, com erro genérico (R1.10).
 
+## Pela tela (spec 014)
+Os passos 1 e 3 também podem ser feitos pela tela, entrando como Admin TI:
+1. **Diretório → Execuções** (`#/diretorio/execucoes`): **Sincronizar agora** cria a execução, que aparece Em andamento e vira Concluída sozinha; **Detalhes** mostra as contagens e os conflitos. Uma segunda sincronização durante a primeira dá o aviso "Já há uma sincronização em andamento." (409).
+2. **Diretório → Grupos** (`#/diretorio/grupos`): a lista traz os grupos espelhados; **Mapear** escolhe o papel e, se o papel exigir, o id do escopo (o Admin TI não lê as tabelas de referência, então o id é digitado e a API o confere). O mapeamento aparece em Mapeamentos, com **Remover**.
+- **Teste que automatiza:** `uv run pytest -m slow tests/e2e_front/test_diretorio.py`.
+
 ## Voltar ao início
 ```bash
 docker compose -f docker/compose.yml down -v

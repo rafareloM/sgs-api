@@ -25,6 +25,7 @@ As specs 008, 009 e 010 e a emenda T21–T22 da 011 foram implementadas antes do
 | [011-recursos-banco-dados](011-recursos-banco-dados/) | Índices, consultas avançadas, views, funções, procedimentos, triggers, log do banco, segurança no SGBD | disciplina de Banco de Dados (Segunda Parte, 13/11) | Aprovado (Rafael, T1–T20); emenda T21–T22 aprovada (Vinicius, 09/11); dono: Vinicius |
 | [012-frontend](012-frontend/) | Interface real a partir do protótipo HTML: autenticação, perfis, unidades, serviços, qualidade, histórico | Entrega 11 (21/11) | Aprovado: requisitos (Vinicius, 09/11), design (Vinicius, Igor Fugagnoli e Erick Sanches, 10/11) e tarefas (Vinicius, 10/11); emenda funcional 1 (R5.5) aguarda o G1 do dono; emenda funcional 2 aprovada na sessão de 10/11, com a confirmação no PR pendente com o dono |
 | [013-trilha-auditoria-reforco](013-trilha-auditoria-reforco/) | Origem, resultado, IP/UA confiável, verificação consistente com cabeça e âncora, `db_change_log` imutável, cobertura, detalhe e histórico com RBAC, retenção e backup | lacunas A–I da auditoria técnica da trilha (11/11) | Aprovado (Vinicius, proprietário, 11/11; G1, G2 e G3 só do dono, pela exceção pontual de `steering/sdd-workflow.md`); implementação na branch `feat/013-trilha-auditoria`; emendas com nota de referência no design da 001 (canonicalização) e no da 011 (`vw_unit_history`) |
+| [014-frontend-diretorio-relatorios](014-frontend-diretorio-relatorios/) | Telas de Relatórios (005) e Diretório: execuções da sincronização e mapeamentos grupo→papel (004, 003) | mapa #25; freeze de 28/11 | Aprovado (Rafael, 26/11; G2 só do dono, exceção de 26/11); dono: Rafael |
 
 ## Rastreabilidade requisito → spec
 
@@ -36,7 +37,7 @@ As specs 008, 009 e 010 e a emenda T21–T22 da 011 foram implementadas antes do
 | RF-04 Aprovação | fora do MVP (papéis e permissões em 003) |
 | RF-05 CNES | fora do MVP |
 | RF-06 Dashboards | 009 |
-| RF-07 Relatórios | 005 (parcial) |
+| RF-07 Relatórios | 005 (parcial), 014 (tela) |
 | RF-08 Histórico | 001 (gravação), 008 (consulta), 013 (reforço) |
 | RF-09 Busca/filtros | 006 |
 | RF-10 Notificações | fora do MVP |

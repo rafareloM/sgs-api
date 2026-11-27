@@ -8,6 +8,7 @@ O login tem limite de 10 por minuto por IP (002/R1.5): cada papel entra uma vez 
 sessão é reaproveitada pelo cookie de refresh; se a API responder 429, a fixture espera a janela.
 """
 
+import json
 import os
 import secrets
 import shutil
@@ -41,6 +42,8 @@ AMBIENTE_COMPOSE = {
     "SGS_CORS_ORIGINS": BASE,  # o refresh confere a Origin (002/R3.6; spec 012, R2.4)
     # FRONTEND_URL sai daqui, e a API exige a origem dele em CORS_ORIGINS (004/T6).
     "SGS_PUBLIC_URL": BASE,
+    # Spec 014: a URL pré-assinada do download aponta o S3 de laboratório na porta da suíte.
+    "SGS_PUBLIC_S3_URL": f"https://s3.localhost:{PORTA_HTTPS}",
 }
 CHAVES_JWT = RAIZ / "secrets" / "jwt-keys.json"
 CHAVES_DE_CIFRA = RAIZ / "secrets" / "crypto-keys.json"
@@ -112,10 +115,17 @@ def senha_demo() -> Iterator[str]:
     segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     senha = secrets.token_urlsafe(16)
     try:
-        subida = _compose("up", "-d", "--build", "--wait", "proxy", check=False, timeout=900)
+        # Spec 014: relatórios (s3) e sincronização do diretório (ldap). O `s3-init` é one-shot e
+        # fica fora do `--wait`: se ele termina antes da checagem, o compose 5.7 dá a subida
+        # como falha ("exited (0)"); por isso sobe depois e a fixture espera o exit 0.
+        subida = _compose(
+            "up", "-d", "--build", "--wait", "proxy", "ldap", "s3", check=False, timeout=900
+        )
         if subida.returncode != 0:
             logs = _compose("logs", "--no-color", "--tail", "100", check=False)
             pytest.fail(f"o compose não subiu:\n{subida.stderr}\n{logs.stdout}")
+        _compose("up", "-d", "s3-init", timeout=300)
+        _esperar_o_s3_init()
         seed = _compose(
             "exec",
             "-T",
@@ -140,6 +150,16 @@ def senha_demo() -> Iterator[str]:
         segredos.apagar(segredos_da_005)
         if criou_pasta:
             CHAVES_JWT.parent.rmdir()
+
+
+def _esperar_o_s3_init() -> None:
+    for _ in range(60):
+        estado = json.loads(_compose("ps", "-a", "--format", "json", "s3-init").stdout or "{}")
+        if estado.get("State") == "exited":
+            assert estado.get("ExitCode") == 0, _compose("logs", "s3-init", check=False).stdout
+            return
+        time.sleep(2)
+    pytest.fail("o s3-init não terminou")
 
 
 @pytest.fixture(scope="session")
