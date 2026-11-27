@@ -17,6 +17,8 @@ import { telaHistorico, telaCadeia } from './views/historico.js';
 import { telaTabelas } from './views/tabelas.js';
 import { telaUnidade } from './views/unidade.js';
 import { telaNovaUnidade } from './views/nova.js';
+import { telaRelatorios } from './views/relatorios.js';
+import { telaDiretorio } from './views/diretorio.js';
 
 // Abertura (spec 012, design § Fluxo): refresh silencioso → /me → menu → rota.
 let perfil = null;
@@ -84,6 +86,10 @@ function registrarRotas() {
   rota('referencias', tela('referencias', (p) => p.global('regra_validacao:manage'), (a, _p, consulta) => telaTabelas(a, consulta)));
   rota('importar', tela('importar', (p) => p.global('unidade:create'), (a) =>
     telaEmDesenvolvimento(a, 'Importar planilha', 'Ainda não há API de importação (spec de CSV do backend).')));
+  rota('relatorios', tela('relatorios', (p) => p.tem('relatorio:export'), (a) => telaRelatorios(a, perfil)));
+  const veDiretorio = (p) => p.tem('diretorio:sync') || p.tem('papel:assign');
+  rota('diretorio', tela('diretorio', veDiretorio, (a, params) => telaDiretorio(a, perfil, params)));
+  rota('diretorio/:aba', tela('diretorio', veDiretorio, (a, params) => telaDiretorio(a, perfil, params)));
   rota('papeis', tela('papeis', (p) => p.tem('papel:assign'), (a) => telaEmImplantacao(a, 'Papéis e atribuições', 'T5 (complemento)')));
   rota('usuarios', tela('usuarios', (p) => p.tem('usuario:manage'), (a) =>
     telaEmDesenvolvimento(a, 'Usuários', 'Ainda não há API de usuários (spec da 003 para /admin/usuarios).')));

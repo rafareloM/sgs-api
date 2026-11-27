@@ -46,9 +46,12 @@ export function itensDoMenu(p) {
     blocoDeGestao.push(['#/historico', 'history', auditor ? 'Histórico geral' : 'Histórico de alterações', 'historico', !p.global('auditoria:read')]);
     if (auditor) blocoDeGestao.push(['#/cadeia', 'shield', 'Verificação da cadeia', 'cadeia']);
   }
+  // Spec 014 (R1.1, R4.1): telas da 005 e da 004.
+  if (p.tem('relatorio:export')) blocoDeGestao.push(['#/relatorios', 'download', 'Relatórios', 'relatorios']);
   // R16.1: catálogos de tipos, só com regra_validacao:manage global (hoje, o Gestor de Dados).
   if (p.global('regra_validacao:manage')) blocoDeGestao.push(['#/referencias', 'edit', 'Tabelas de referência', 'referencias']);
   if (p.global('unidade:create')) blocoDeGestao.push(['#/importar', 'upload', 'Importar planilha', 'importar', true]);
+  if (p.tem('diretorio:sync') || p.tem('papel:assign')) blocoDeGestao.push(['#/diretorio', 'refresh', 'Diretório', 'diretorio']);
   if (p.tem('papel:assign')) blocoDeGestao.push(['#/papeis', 'user', 'Papéis e atribuições', 'papeis']);
   if (p.tem('usuario:manage')) blocoDeGestao.push(['#/usuarios', 'user', 'Usuários', 'usuarios', true]);
   if (itens.length && blocoDeGestao.length) itens.push(['sep']);

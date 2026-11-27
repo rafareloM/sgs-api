@@ -41,6 +41,8 @@ AMBIENTE_COMPOSE = {
     "SGS_CORS_ORIGINS": BASE,  # o refresh confere a Origin (002/R3.6; spec 012, R2.4)
     # FRONTEND_URL sai daqui, e a API exige a origem dele em CORS_ORIGINS (004/T6).
     "SGS_PUBLIC_URL": BASE,
+    # Spec 014: a URL pré-assinada do download aponta o S3 de laboratório na porta da suíte.
+    "SGS_PUBLIC_S3_URL": f"https://s3.localhost:{PORTA_HTTPS}",
 }
 CHAVES_JWT = RAIZ / "secrets" / "jwt-keys.json"
 CHAVES_DE_CIFRA = RAIZ / "secrets" / "crypto-keys.json"
@@ -112,7 +114,9 @@ def senha_demo() -> Iterator[str]:
     segredos_da_005 = segredos.criar_faltando(segredos.DA_005)
     senha = secrets.token_urlsafe(16)
     try:
-        subida = _compose("up", "-d", "--build", "--wait", "proxy", check=False, timeout=900)
+        # Spec 014: relatórios (s3, s3-init) e sincronização do diretório (ldap).
+        servicos = ("proxy", "ldap", "s3", "s3-init")
+        subida = _compose("up", "-d", "--build", "--wait", *servicos, check=False, timeout=900)
         if subida.returncode != 0:
             logs = _compose("logs", "--no-color", "--tail", "100", check=False)
             pytest.fail(f"o compose não subiu:\n{subida.stderr}\n{logs.stdout}")
