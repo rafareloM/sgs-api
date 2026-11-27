@@ -103,6 +103,10 @@ Diretório: abrir → aba permitida → Execuções: GET /execucoes → Sincroni
 - **Sincronização no E2E muda usuários** do banco descartável: os usuários do seed demo são locais e não são tocados.
 - **Segregação de funções (403) no mapeamento** não acontece com o Admin TI do seed (conta local, sem grupo): o teste simula a resposta com `page.route` (R6.2).
 
+- *Notas de implementação (26/11/2026, integração):*
+  - o `s3-init` saiu do `up --wait` da suíte (o compose 5.7 dá como falha um one-shot que termina antes da checagem); a fixture espera o exit 0, como `tests/e2e/test_export_s3.py`;
+  - o SeaweedFS de laboratório ganhou `-master.volumeSizeLimitMB=64` em `docker/compose.yml`: o teto de volumes é o disco livre dividido pelo tamanho do volume (1 GiB), e com ~5 GB livres o bucket ficava sem volume depois das outras suítes ("Not enough data nodes found"), e a geração falhava. O laboratório na AWS não sobe o `s3` (perfil `seaweedfs`), então não muda.
+
 ## Estratégia de testes
 - `tests/e2e_front/conftest.py`: o `up` passa a subir `proxy ldap s3 s3-init`, e `AMBIENTE_COMPOSE` ganha `SGS_PUBLIC_S3_URL=https://s3.localhost:18444`. Nada mais muda.
 - `tests/e2e_front/test_relatorios.py` (novo): menu por papel (R1.1); Diretoria sem "Trilha de auditoria" (R1.3); pedido de inventário CSV pelo Gestor de Dados aparece `pendente` e vira `concluido` sem clique (R1.2, R2.2); Baixar dispara um download `.csv` cujo SHA-256 é o do bloco Integridade (R2.3, R3.1); "Copiar integridade.json" copia o objeto da API (R3.2, com permissão de clipboard no contexto); trilha com período > 366 dias mostra o erro no campo (R1.6); laço para ao sair da tela (sem `GET /relatorios` por 4 s depois de navegar, R2.2); estados simulados: 503 no pedido (R1.7), `falhou` com "Pedir de novo" (R2.5), 409 no download (R2.4).

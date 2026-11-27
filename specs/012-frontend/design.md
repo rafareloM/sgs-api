@@ -135,6 +135,8 @@ Nenhum. Esta spec não altera o banco. O front não guarda dados de negócio. No
 6. **Atualização:** recarrega ao navegar; nesta spec não há consulta periódica (vale só para notificações, no escopo completo).
 
 ## Perfis (R3.2, R3.5, DF8)
+- *Referência (26/11/2026):* a spec 014 (aprovada em 26/11/2026, dono Rafael) acrescenta ao menu "Relatórios" (`#/relatorios`, com `relatorio:export`) e "Diretório" (`#/diretorio/:aba`, com `diretorio:sync` ou `papel:assign`). Com isso, o início do Admin TI passa de `#/papeis` para `#/diretorio` (primeira tela do menu, R3.5). O texto está em `specs/014-frontend-diretorio-relatorios/design.md`. Esta nota não muda o status nem o texto normativo desta spec.
+
 Menu e botões derivados **só das permissões existentes** na matriz da spec 003 (`/me`), sem ampliá-la. Conferido contra a matriz atual, incluindo os ajustes da 0011_09:
 
 | Papel | Permissões relevantes (matriz atual) | Início | Menu (escopo mínimo) | Ações [M] |

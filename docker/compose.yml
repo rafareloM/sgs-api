@@ -310,6 +310,10 @@ services:
       - -ip=s3
       - -ip.bind=0.0.0.0
       - -master.telemetry=false
+      # O teto de volumes sai do disco livre dividido pelo tamanho do volume (1 GiB por padrão):
+      # com ~5 GB livres, o bucket ficava sem volume ("Not enough data nodes found") e o envio
+      # do relatório falhava. Volumes de 64 MiB bastam para o laboratório.
+      - -master.volumeSizeLimitMB=64
       - -s3
       - -s3.port=8333
       - -s3.port.iceberg=0
