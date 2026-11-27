@@ -58,6 +58,12 @@ Os designs revistos na regularização das specs 008, 009, 010 e 011 (itens V1 a
 - **Contexto:** prazos de 28/11/2026 (code freeze) e 05/12/2026 (SR2), em `docs/relatorios/PENDENCIAS_EXTERNAS.md`. A falta da revisão independente fica registrada como limitação no `Status:` do `design.md` das duas specs.
 - **Alcance:** vale só para o G2 das specs 004 e 005. O G1 e o G3 já são só do dono pela tabela. A regra geral não muda para as demais specs.
 
+## Exceção pontual: spec 014, design aprovado só pelo dono (Rafael, 26/11/2026)
+- **O que permite:** que o G2 (design) da spec 014 seja aprovado só pelo dono, Rafael (rafareloM), sem o segundo integrante que a tabela exige.
+- **Quem decidiu:** o próprio Rafael, dono da spec e responsável pelo projeto, na sessão de trabalho de 26/11/2026. A decisão foi registrada pelo agente por autorização expressa dada nessa sessão. O agente não aprova nada em nome de ninguém.
+- **Contexto:** code freeze de 28/11/2026. A falta da revisão independente fica registrada como limitação no `Status:` do `design.md` da 014.
+- **Alcance:** vale só para o G2 da spec 014. A regra geral não muda para as demais specs.
+
 ## Dono da spec: atribuição e transferência
 - O dono fica numa linha do cabeçalho do `requirements.md`: `- Dono humano: <nome> (<login>)`. Design e tarefas seguem o dono dos requisitos.
 - Spec sem dono registrado fica com o responsável pelo projeto até alguém assumir. Responsável pelo projeto desde 09/11/2026: Vinicius (ViniciusVbm). Também responsável, com os mesmos poderes: Rafael (rafareloM), administrador do repositório, registrado em 24/11/2026 por declaração dele na sessão de trabalho (registro do agente).
