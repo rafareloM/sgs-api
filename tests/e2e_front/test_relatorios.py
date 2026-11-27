@@ -1,19 +1,23 @@
-"""Tela Relatórios (spec 014, T2: R1.2 a R1.7, R2.1, R2.2, R2.5).
+"""Tela Relatórios (spec 014, T2: R1.2 a R1.7, R2.1, R2.2, R2.5; T3: R2.3, R2.4, R3.1 a R3.3).
 
 Contra o compose com SeaweedFS. Só os estados que o laboratório não produz (503, `falhou`) ou
 não segura por tempo bastante (`pendente`) são simulados por `page.route` (R6.2).
 """
 
+import hashlib
 import json
 import re
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+import pytest
 from playwright.sync_api import Page, Request, Route, expect
 
 from tests.e2e_front.apoio import api as _api
 from tests.e2e_front.apoio import token as _token
+from tests.e2e_front.conftest import BASE
 
 Sessao = Callable[[str], Page]
 LISTA = re.compile(r"/api/v1/relatorios(\?|$)")
@@ -235,3 +239,90 @@ def test_falhou_permite_pedir_de_novo(sessao_de: Sessao) -> None:
         "filtros": falho["filtros"],
     }
     expect(pagina.locator(".toast", has_text="Relatório pedido")).to_be_visible()
+
+
+@pytest.fixture(scope="module")
+def concluido(sessao_de: Sessao) -> dict[str, Any]:
+    """Um inventário CSV gerado de verdade no SeaweedFS do compose."""
+    pagina = sessao_de("GESTOR_DADOS")
+    token = _token(pagina)
+    corpo = {"tipo": "inventario_unidades", "formato": "csv", "filtros": {}}
+    criado = _api(pagina, token, "/relatorios", "POST", corpo)
+    for _ in range(60):
+        pedido: dict[str, Any] = _api(pagina, token, f"/relatorios/{criado['id']}")
+        if pedido["status"] in ("concluido", "falhou"):
+            break
+        time.sleep(1)
+    pagina.close()
+    assert pedido["status"] == "concluido", pedido
+    return pedido
+
+
+def _detalhes(pagina: Page, id_: str) -> Any:
+    pagina.locator(f"tr[data-id='{id_}']").get_by_role("button", name="Detalhes").click()
+    bloco = pagina.locator("[data-ref=integridade]")
+    expect(bloco).to_be_visible()
+    return bloco
+
+
+def test_baixar_entrega_arquivo_com_o_sha256_da_integridade(
+    sessao_de: Sessao, concluido: dict[str, Any]
+) -> None:
+    """R2.3, R3.1: o download vem do S3 e o SHA-256 do arquivo é o do bloco Integridade."""
+    pagina = sessao_de("GESTOR_DADOS")
+    _abrir(pagina)
+    integridade = concluido["integridade"]
+    bloco = _detalhes(pagina, concluido["id"])
+    expect(bloco.locator("[data-ref=sha256]")).to_have_text(integridade["sha256"])
+    expect(bloco.locator("[data-ref=algoritmo]")).to_have_text(integridade["algoritmo"])
+    expect(bloco.locator("[data-ref=kid]")).to_have_text(integridade["kid"])
+    expect(bloco.locator("[data-ref=assinatura]")).to_have_text(integridade["assinatura"])
+    sha_da_tela = bloco.locator("[data-ref=sha256]").inner_text()
+    pagina.get_by_role("button", name="Fechar").click()
+
+    linha = pagina.locator(f"tr[data-id='{concluido['id']}']")
+    with (
+        pagina.expect_response("**/api/v1/relatorios/*/download") as resposta,
+        pagina.expect_download() as baixado,
+    ):
+        linha.get_by_role("button", name="Baixar").click()
+    assert baixado.value.suggested_filename.endswith(".csv")
+    conteudo = Path(baixado.value.path()).read_bytes()
+    assert hashlib.sha256(conteudo).hexdigest() == sha_da_tela
+    # D005-1: a URL pré-assinada não aparece na tela e a tela não muda.
+    url = resposta.value.json()["url"]
+    html = pagina.content()
+    assert url not in html
+    assert "X-Amz-Signature" not in html
+    expect(pagina).to_have_url(re.compile(r"#/relatorios$"))
+
+
+def test_copiar_integridade_json(sessao_de: Sessao, concluido: dict[str, Any]) -> None:
+    """R3.2, R3.3: copia o objeto `integridade` e aponta o roteiro e as chaves públicas."""
+    pagina = sessao_de("GESTOR_DADOS")
+    pagina.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=BASE)
+    _abrir(pagina)
+    bloco = _detalhes(pagina, concluido["id"])
+    bloco.get_by_role("button", name="Copiar integridade.json").click()
+    expect(pagina.locator(".toast", has_text="Copiado")).to_be_visible()
+    copiado = pagina.evaluate("navigator.clipboard.readText()")
+    assert json.loads(copiado) == concluido["integridade"]
+    expect(bloco).to_contain_text("docs/operacao/verificar-relatorio.md")
+    chaves = bloco.get_by_role("link", name="Chaves públicas")
+    expect(chaves).to_have_attribute("href", "/.well-known/relatorios-jwks.json")
+    expect(chaves).to_have_attribute("target", "_blank")
+
+
+def test_download_409_vira_aviso(sessao_de: Sessao, concluido: dict[str, Any]) -> None:
+    """R2.4: 409 ao baixar mostra a mensagem da API num aviso, sem sair da tela."""
+    pagina = sessao_de("GESTOR_DADOS")
+    detalhe = "O relatório não está concluído ou já venceu."
+    pagina.route(
+        "**/api/v1/relatorios/*/download",
+        lambda rota: _json(rota, {"title": "Conflito", "status": 409, "detail": detalhe}, 409),
+    )
+    _abrir(pagina)
+    linha = pagina.locator(f"tr[data-id='{concluido['id']}']")
+    linha.get_by_role("button", name="Baixar").click()
+    expect(pagina.locator(".toast.err", has_text=detalhe)).to_be_visible()
+    expect(pagina).to_have_url(re.compile(r"#/relatorios$"))

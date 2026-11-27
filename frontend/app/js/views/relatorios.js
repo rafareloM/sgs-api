@@ -5,6 +5,7 @@ import { carregando, erro, vazio } from '../ui/estado.js';
 import { campo, lerFormulario, limparErros, marcarErro, mostrarErros } from '../ui/form.js';
 import { fmtData, fmtDataHora } from '../ui/format.js';
 import { toast } from '../ui/toast.js';
+import { abrirModal, fecharModal } from '../ui/modal.js';
 import { carregarReferencia, ROTULO_DO_STATUS } from '../referencias.js';
 import { intervaloDoPeriodo } from '../periodo.js';
 import { atualizarEnquanto } from '../atualizacao.js';
@@ -118,10 +119,14 @@ export async function telaRelatorios(alvo, perfil) {
         <td>${r.solicitado_por === perfil.me.id ? 'Você' : html`Outro usuário <code title="${r.solicitado_por}">${String(r.solicitado_por).slice(0, 8)}</code>`}</td>
         <td>${situacao(r)}${r.status === 'falhou' && r.erro ? html`<div class="t-sub" data-ref="erro">${r.erro}</div>` : ''}</td>
         <td>${fmtDataHora(r.concluido_em) || '—'}</td><td>${tamanho(r.tamanho_bytes)}</td><td>${fmtDataHora(r.vence_em) || '—'}</td>
-        <td>${r.status === 'falhou' && tipos.includes(r.tipo) ? html`<button class="btn btn-line btn-sm" type="button" data-repetir="${r.id}">${ic('refresh')}Pedir de novo</button>` : ''}</td></tr>`)}</tbody></table></div>
+        <td><button class="btn btn-line btn-sm" type="button" data-detalhe="${r.id}">Detalhes</button>
+          ${r.status === 'concluido' && !r.vencido && perfil.tem('relatorio:download') ? html`<button class="btn btn-primary btn-sm" type="button" data-baixar="${r.id}">${ic('download')}Baixar</button>` : ''}
+          ${r.status === 'falhou' && tipos.includes(r.tipo) ? html`<button class="btn btn-line btn-sm" type="button" data-repetir="${r.id}">${ic('refresh')}Pedir de novo</button>` : ''}</td></tr>`)}</tbody></table></div>
       ${paginacao(pagina, dados.total)}` : html`${vazio('Nenhum relatório pedido ainda.')}${pagina > 1 ? paginacao(pagina, dados.total) : ''}`);
     lista.querySelectorAll('[data-pagina]').forEach((b) => b.addEventListener('click', async () => { await carregar(Number(b.dataset.pagina)); disparar(); }));
     lista.querySelectorAll('[data-repetir]').forEach((b) => b.addEventListener('click', () => repetir(b)));
+    lista.querySelectorAll('[data-baixar]').forEach((b) => b.addEventListener('click', () => baixar(b)));
+    lista.querySelectorAll('[data-detalhe]').forEach((b) => b.addEventListener('click', () => detalhar(b.dataset.detalhe)));
   };
 
   // R2.2: 3 s, por no máximo 2 min, só com pedido pendente ou gerando; para ao sair da tela.
@@ -149,6 +154,66 @@ export async function telaRelatorios(alvo, perfil) {
       botao.disabled = false;
       toast('err', 'Não foi possível pedir o relatório', mensagemDe(falha));
     }
+  };
+
+  // R2.3, D005-1: a URL pré-assinada é credencial; só vai para a navegação (sem DOM, estado ou log).
+  const baixar = async (botao) => {
+    botao.disabled = true;
+    try {
+      const { dados } = await chamar('GET', `/relatorios/${encodeURIComponent(botao.dataset.baixar)}/download`);
+      location.assign(dados.url);
+    } catch (falha) {
+      toast('err', 'Não foi possível baixar o relatório', mensagemDe(falha)); // R2.4: 409, 403, 503
+    } finally {
+      botao.disabled = false;
+    }
+  };
+
+  // R3: detalhe sempre lido de novo; em `concluido`, os dados para conferir a assinatura fora daqui.
+  const detalhar = async (id) => {
+    const caixa = abrirModal(html`<div class="modal-h"><h2>Relatório</h2></div><div class="modal-b" id="rel-det">${carregando('Lendo o pedido…')}</div>
+      <div class="modal-f"><button class="btn btn-line" type="button" id="rel-fechar">Fechar</button></div>`, { rotulo: 'Detalhes do relatório' });
+    caixa.querySelector('#rel-fechar').addEventListener('click', fecharModal);
+    const destino = caixa.querySelector('#rel-det');
+    let r;
+    try {
+      ({ dados: r } = await chamar('GET', `/relatorios/${encodeURIComponent(id)}`));
+    } catch (falha) {
+      montar(destino, erro(falha));
+      return;
+    }
+    const kv = (rotulo, valor, ref = '') => html`<div><dt>${rotulo}</dt><dd ${ref ? html`data-ref="${ref}"` : ''}>${valor}</dd></div>`;
+    const i = r.integridade;
+    const json = i ? JSON.stringify(i, null, 2) : '';
+    montar(destino, html`<dl class="kv" data-ref="detalhe-relatorio">
+      ${kv('Tipo', TIPOS[r.tipo] || r.tipo)}${kv('Formato', FORMATOS[r.formato] || r.formato)}
+      ${kv('Filtros', filtrosEmTexto(r, nomes))}${kv('Situação', situacao(r))}
+      ${kv('Pedido em', fmtDataHora(r.criado_em))}${kv('Pronto em', fmtDataHora(r.concluido_em) || '—')}
+      ${kv('Tamanho', tamanho(r.tamanho_bytes))}${kv('Validade', fmtDataHora(r.vence_em) || '—')}
+      ${r.erro ? kv('Erro', r.erro, 'erro') : ''}</dl>
+      ${i ? html`<section data-ref="integridade"><h3>Integridade</h3><dl class="kv">
+        ${kv('SHA-256', html`<code class="hash">${i.sha256}</code>`, 'sha256')}
+        ${kv('Algoritmo', i.algoritmo, 'algoritmo')}
+        ${kv('kid', html`<code>${i.kid}</code>`, 'kid')}
+        ${kv('Assinatura', html`<code class="hash">${i.assinatura}</code>`, 'assinatura')}</dl>
+        <p><button class="btn btn-line btn-sm" type="button" id="rel-copiar">Copiar integridade.json</button></p>
+        <pre class="metadados" data-ref="integridade-json" hidden>${json}</pre>
+        <p class="hint">Para conferir o arquivo, siga o roteiro <code>docs/operacao/verificar-relatorio.md</code> do repositório.
+          <a href="/.well-known/relatorios-jwks.json" target="_blank" rel="noopener">Chaves públicas</a></p></section>` : ''}`);
+    const copiar = destino.querySelector('#rel-copiar');
+    if (!copiar) return;
+    // R3.2: o objeto `integridade` no formato que o roteiro lê; sem clipboard, mostra e seleciona.
+    copiar.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(json);
+        toast('ok', 'Copiado', 'Salve como integridade.json.');
+      } catch {
+        const pre = destino.querySelector('[data-ref=integridade-json]');
+        pre.hidden = false;
+        getSelection().selectAllChildren(pre);
+        toast('wait', 'Copie o texto selecionado', 'A área de transferência não está disponível.');
+      }
+    });
   };
 
   document.getElementById('rel-atualizar').addEventListener('click', async () => { await carregar(); disparar(); });
